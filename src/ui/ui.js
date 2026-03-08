@@ -1,0 +1,522 @@
+(function () {
+  const MESSAGES = {
+    en: {
+      appTitle: "Lecture Assistant",
+      sessions: "Sessions",
+      new: "New",
+      recovery: "Recovery",
+      noPendingDraft: "No pending draft.",
+      liveTranscript: "Live Transcript",
+      untitledLecture: "Untitled lecture",
+      noSessionLoaded: "No session loaded",
+      idle: "Idle",
+      startRecording: "Start Recording",
+      stopRecording: "Stop Recording",
+      generateNotes: "Generate Notes",
+      settings: "Settings",
+      lectureTitle: "Lecture Title",
+      lectureTitlePlaceholder: "Distributed Systems - Week 5",
+      courseName: "Course Name",
+      courseNamePlaceholder: "CS 540",
+      lectureTopic: "Lecture Topic",
+      lectureTopicPlaceholder: "Consensus and Paxos",
+      interfaceLanguage: "Interface Language",
+      additionalContext: "Additional Context",
+      additionalContextPlaceholder: "Instructor focus, assignment context, exam hints, or anything Gemini should know.",
+      referenceDocuments: "Reference Documents",
+      referenceDocumentsHelp: "Upload .txt, .md, or .pdf lecture materials before generating notes.",
+      upload: "Upload",
+      detectedTechnicalTerms: "Detected Technical Terms",
+      partialRecognition: "Partial Recognition",
+      waitingForSpeech: "Waiting for speech input.",
+      aiNotes: "AI Notes",
+      markdownLectureNotes: "Markdown lecture notes",
+      ready: "Ready.",
+      preview: "Preview",
+      defaultNotes: "# Lecture Title\n\nDate\n\n## Lecture Summary\n\nGenerated notes will appear here.",
+      settingsTitle: "Settings",
+      apiConfiguration: "API configuration",
+      close: "Close",
+      azureSpeechApiKey: "Azure Speech API Key",
+      pasteAzureSpeechKey: "Paste Azure Speech key",
+      azureRegion: "Azure Region",
+      geminiApiKey: "Gemini API Key",
+      pasteGeminiKey: "Paste Gemini key",
+      recognitionLanguages: "Recognition Languages",
+      segmentIntervalFallback: "Segment Interval Fallback (minutes)",
+      keysSource: "Keys can come from browser storage or config/local-config.js.",
+      reset: "Reset",
+      saveSettings: "Save Settings",
+      noTermsDetectedYet: "No terms detected yet",
+      noDocumentsUploaded: "No documents uploaded.",
+      noLecturesSavedYet: "No lectures saved yet.",
+      notesReady: "Notes ready",
+      transcriptOnly: "Transcript only",
+      transcriptWillAppear: "Transcript will appear here as the lecture progresses.",
+      configureAzureFirst: "Configure Azure Speech credentials first.",
+      configureGeminiFirst: "Configure Gemini API key first.",
+      transcriptEmpty: "Transcript is empty. Record or load a lecture first.",
+      listening: "Listening",
+      error: "Error",
+      stopped: "Stopped",
+      lectureSavedLocally: "Lecture saved locally.",
+      preparingReferenceContext: "Preparing reference context",
+      generationFailed: "Generation failed",
+      addedReferenceDocuments: "Added {count} reference document{suffix}.",
+      settingsSavedLocally: "Settings saved locally.",
+      settingsReset: "Settings reset.",
+      stopCurrentRecordingFirst: "Stop the current recording before starting a new lecture.",
+      stopRecordingBeforeSwitching: "Stop recording before switching lectures.",
+      recoveredDraft: "Recovered draft from {time}. Recording must be started again manually.",
+      draftAutosavedAt: "Draft autosaved at {time}.",
+    },
+    "zh-TW": {
+      appTitle: "Lecture Assistant",
+      sessions: "講座紀錄",
+      new: "新增",
+      recovery: "復原",
+      noPendingDraft: "沒有待復原的草稿。",
+      liveTranscript: "即時逐字稿",
+      untitledLecture: "未命名講座",
+      noSessionLoaded: "尚未載入任何講座",
+      idle: "閒置中",
+      startRecording: "開始錄音",
+      stopRecording: "停止錄音",
+      generateNotes: "產生筆記",
+      settings: "設定",
+      lectureTitle: "講座標題",
+      lectureTitlePlaceholder: "分散式系統 - 第 5 週",
+      courseName: "課程名稱",
+      courseNamePlaceholder: "CS 540",
+      lectureTopic: "講座主題",
+      lectureTopicPlaceholder: "共識演算法與 Paxos",
+      interfaceLanguage: "介面語言",
+      additionalContext: "補充背景",
+      additionalContextPlaceholder: "輸入教師重點、作業背景、考試提示，或任何希望 Gemini 了解的內容。",
+      referenceDocuments: "參考文件",
+      referenceDocumentsHelp: "在產生筆記前上傳 .txt、.md 或 .pdf 講義資料。",
+      upload: "上傳",
+      detectedTechnicalTerms: "偵測到的技術名詞",
+      partialRecognition: "即時辨識片段",
+      waitingForSpeech: "等待語音輸入。",
+      aiNotes: "AI 筆記",
+      markdownLectureNotes: "Markdown 講座筆記",
+      ready: "已就緒。",
+      preview: "預覽",
+      defaultNotes: "# Lecture Title\n\nDate\n\n## Lecture Summary\n\n筆記會顯示在這裡。",
+      settingsTitle: "設定",
+      apiConfiguration: "API 設定",
+      close: "關閉",
+      azureSpeechApiKey: "Azure Speech API 金鑰",
+      pasteAzureSpeechKey: "貼上 Azure Speech 金鑰",
+      azureRegion: "Azure 區域",
+      geminiApiKey: "Gemini API 金鑰",
+      pasteGeminiKey: "貼上 Gemini 金鑰",
+      recognitionLanguages: "辨識語言",
+      segmentIntervalFallback: "分段後備間隔（分鐘）",
+      keysSource: "金鑰可來自瀏覽器儲存或 config/local-config.js。",
+      reset: "重設",
+      saveSettings: "儲存設定",
+      noTermsDetectedYet: "尚未偵測到技術名詞",
+      noDocumentsUploaded: "尚未上傳任何文件。",
+      noLecturesSavedYet: "尚未儲存任何講座。",
+      notesReady: "筆記已完成",
+      transcriptOnly: "僅有逐字稿",
+      transcriptWillAppear: "逐字稿會隨著講座進行顯示於此。",
+      configureAzureFirst: "請先設定 Azure Speech 憑證。",
+      configureGeminiFirst: "請先設定 Gemini API 金鑰。",
+      transcriptEmpty: "逐字稿為空，請先錄音或載入講座。",
+      listening: "聆聽中",
+      error: "錯誤",
+      stopped: "已停止",
+      lectureSavedLocally: "講座已儲存在本機。",
+      preparingReferenceContext: "正在整理參考內容",
+      generationFailed: "產生失敗",
+      addedReferenceDocuments: "已加入 {count} 份參考文件。",
+      settingsSavedLocally: "設定已儲存在本機。",
+      settingsReset: "設定已重設。",
+      stopCurrentRecordingFirst: "開始新講座前，請先停止目前錄音。",
+      stopRecordingBeforeSwitching: "切換講座前，請先停止錄音。",
+      recoveredDraft: "已從 {time} 復原草稿。錄音需要手動重新開始。",
+      draftAutosavedAt: "草稿已於 {time} 自動儲存。",
+    },
+  };
+
+  function formatMessage(template, values) {
+    return template.replace(/\{(\w+)\}/g, (_, key) => (values && values[key] !== undefined ? values[key] : ""));
+  }
+
+  function formatDate(value, language) {
+    if (!value) {
+      return language === "zh-TW" ? MESSAGES["zh-TW"].noSessionLoaded : MESSAGES.en.noSessionLoaded;
+    }
+    return new Date(value).toLocaleString(language === "zh-TW" ? "zh-TW" : "en-US");
+  }
+
+  function formatDuration(ms) {
+    const totalSeconds = Math.max(0, Math.floor((ms || 0) / 1000));
+    const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
+    const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
+    const seconds = String(totalSeconds % 60).padStart(2, "0");
+    return `${hours}:${minutes}:${seconds}`;
+  }
+
+  function formatBytes(bytes) {
+    if (!bytes) {
+      return "0 KB";
+    }
+    if (bytes < 1024 * 1024) {
+      return `${Math.round(bytes / 102.4) / 10} KB`;
+    }
+    return `${Math.round(bytes / 104857.6) / 10} MB`;
+  }
+
+  const UI = {
+    refs: {},
+    currentLanguage: "en",
+
+    init() {
+      this.refs = {
+        appTitle: document.querySelector("aside p.text-xs.font-semibold.uppercase"),
+        sessionsTitle: document.querySelector("aside h1"),
+        historyList: document.getElementById("historyList"),
+        recoveryTitle: document.querySelector("#recoveryMessage").previousElementSibling,
+        recoveryMessage: document.getElementById("recoveryMessage"),
+        liveTranscriptLabel: document.getElementById("lectureTitleDisplay").previousElementSibling,
+        transcriptContainer: document.getElementById("transcriptContainer"),
+        notesContainer: document.getElementById("notesContainer"),
+        termList: document.getElementById("termList"),
+        partialTranscript: document.getElementById("partialTranscript"),
+        speechStatus: document.getElementById("speechStatus"),
+        notesStatus: document.getElementById("notesStatus"),
+        lectureTitleDisplay: document.getElementById("lectureTitleDisplay"),
+        lectureMetaDate: document.getElementById("lectureMetaDate"),
+        lectureMetaDuration: document.getElementById("lectureMetaDuration"),
+        lectureTitleLabel: document.querySelector("#lectureTitleInput").previousElementSibling,
+        lectureTitleInput: document.getElementById("lectureTitleInput"),
+        courseNameLabel: document.querySelector("#courseNameInput").previousElementSibling,
+        courseNameInput: document.getElementById("courseNameInput"),
+        lectureTopicLabel: document.querySelector("#lectureTopicInput").previousElementSibling,
+        lectureTopicInput: document.getElementById("lectureTopicInput"),
+        additionalContextLabel: document.querySelector("#additionalContextInput").previousElementSibling,
+        additionalContextInput: document.getElementById("additionalContextInput"),
+        interfaceLanguageLabel: document.querySelector("#interfaceLanguageSelect").previousElementSibling,
+        interfaceLanguageSelect: document.getElementById("interfaceLanguageSelect"),
+        documentInput: document.getElementById("documentInput"),
+        documentList: document.getElementById("documentList"),
+        referenceDocumentsTitle: document.querySelector("#documentList").previousElementSibling.querySelector("p.text-xs.font-semibold.uppercase"),
+        referenceDocumentsHelp: document.querySelector("#documentList").previousElementSibling.querySelector("p.mt-2.text-sm.leading-6"),
+        uploadLabel: document.querySelector("label.cursor-pointer.rounded-full"),
+        technicalTermsTitle: document.querySelector("#termList").previousElementSibling,
+        partialRecognitionTitle: document.querySelector("#partialTranscript").previousElementSibling,
+        startButton: document.getElementById("startButton"),
+        stopButton: document.getElementById("stopButton"),
+        generateNotesButton: document.getElementById("generateNotesButton"),
+        settingsButton: document.getElementById("settingsButton"),
+        newLectureButton: document.getElementById("newLectureButton"),
+        settingsDialog: document.getElementById("settingsDialog"),
+        settingsForm: document.getElementById("settingsForm"),
+        closeSettingsButton: document.getElementById("closeSettingsButton"),
+        resetSettingsButton: document.getElementById("resetSettingsButton"),
+        saveSettingsButton: document.getElementById("saveSettingsButton"),
+        azureKeyInput: document.getElementById("azureKeyInput"),
+        azureRegionInput: document.getElementById("azureRegionInput"),
+        geminiKeyInput: document.getElementById("geminiKeyInput"),
+        recognitionLanguagesInput: document.getElementById("recognitionLanguagesInput"),
+        segmentIntervalInput: document.getElementById("segmentIntervalInput"),
+        settingsLanguageInput: document.getElementById("settingsLanguageInput"),
+        toastContainer: document.getElementById("toastContainer"),
+        aiNotesLabel: document.querySelector("section:nth-of-type(2) header p.text-xs.font-semibold.uppercase"),
+        aiNotesTitle: document.querySelector("section:nth-of-type(2) header h2"),
+        previewTitle: document.querySelector("#notesContainer").previousElementSibling,
+        settingsTitle: document.querySelector("#settingsDialog p.text-xs.font-semibold.uppercase"),
+        settingsSubtitle: document.querySelector("#settingsDialog h2"),
+        azureKeyLabel: document.querySelector("#azureKeyInput").previousElementSibling,
+        azureRegionLabel: document.querySelector("#azureRegionInput").previousElementSibling,
+        geminiKeyLabel: document.querySelector("#geminiKeyInput").previousElementSibling,
+        recognitionLanguagesLabel: document.querySelector("#recognitionLanguagesInput").previousElementSibling,
+        segmentIntervalLabel: document.querySelector("#segmentIntervalInput").previousElementSibling,
+        settingsLanguageLabel: document.querySelector("#settingsLanguageInput").previousElementSibling,
+        settingsFooterText: document.querySelector("#settingsDialog .border-t p.text-sm.text-steel"),
+      };
+
+      return this.refs;
+    },
+
+    t(key, values) {
+      const languagePack = MESSAGES[this.currentLanguage] || MESSAGES.en;
+      const fallback = MESSAGES.en[key] || key;
+      const template = languagePack[key] || fallback;
+      return values ? formatMessage(template, values) : template;
+    },
+
+    setLanguage(language) {
+      this.currentLanguage = language === "zh-TW" ? "zh-TW" : "en";
+      document.documentElement.lang = this.currentLanguage;
+      document.title = this.t("appTitle");
+
+      this.refs.appTitle.textContent = this.t("appTitle");
+      this.refs.sessionsTitle.textContent = this.t("sessions");
+      this.refs.newLectureButton.textContent = this.t("new");
+      this.refs.recoveryTitle.textContent = this.t("recovery");
+      this.refs.liveTranscriptLabel.textContent = this.t("liveTranscript");
+      this.refs.startButton.textContent = this.t("startRecording");
+      this.refs.stopButton.textContent = this.t("stopRecording");
+      this.refs.generateNotesButton.textContent = this.t("generateNotes");
+      this.refs.settingsButton.textContent = this.t("settings");
+      this.refs.lectureTitleLabel.textContent = this.t("lectureTitle");
+      this.refs.lectureTitleInput.placeholder = this.t("lectureTitlePlaceholder");
+      this.refs.courseNameLabel.textContent = this.t("courseName");
+      this.refs.courseNameInput.placeholder = this.t("courseNamePlaceholder");
+      this.refs.lectureTopicLabel.textContent = this.t("lectureTopic");
+      this.refs.lectureTopicInput.placeholder = this.t("lectureTopicPlaceholder");
+      this.refs.interfaceLanguageLabel.textContent = this.t("interfaceLanguage");
+      this.refs.additionalContextLabel.textContent = this.t("additionalContext");
+      this.refs.additionalContextInput.placeholder = this.t("additionalContextPlaceholder");
+      this.refs.referenceDocumentsTitle.textContent = this.t("referenceDocuments");
+      this.refs.referenceDocumentsHelp.textContent = this.t("referenceDocumentsHelp");
+      this.refs.uploadLabel.childNodes[0].textContent = this.t("upload");
+      this.refs.technicalTermsTitle.textContent = this.t("detectedTechnicalTerms");
+      this.refs.partialRecognitionTitle.textContent = this.t("partialRecognition");
+      this.refs.aiNotesLabel.textContent = this.t("aiNotes");
+      this.refs.aiNotesTitle.textContent = this.t("markdownLectureNotes");
+      this.refs.previewTitle.textContent = this.t("preview");
+      this.refs.settingsTitle.textContent = this.t("settingsTitle");
+      this.refs.settingsSubtitle.textContent = this.t("apiConfiguration");
+      this.refs.closeSettingsButton.textContent = this.t("close");
+      this.refs.azureKeyLabel.textContent = this.t("azureSpeechApiKey");
+      this.refs.azureKeyInput.placeholder = this.t("pasteAzureSpeechKey");
+      this.refs.azureRegionLabel.textContent = this.t("azureRegion");
+      this.refs.geminiKeyLabel.textContent = this.t("geminiApiKey");
+      this.refs.geminiKeyInput.placeholder = this.t("pasteGeminiKey");
+      this.refs.recognitionLanguagesLabel.textContent = this.t("recognitionLanguages");
+      this.refs.segmentIntervalLabel.textContent = this.t("segmentIntervalFallback");
+      this.refs.settingsLanguageLabel.textContent = this.t("interfaceLanguage");
+      this.refs.settingsFooterText.textContent = this.t("keysSource");
+      this.refs.resetSettingsButton.textContent = this.t("reset");
+      this.refs.saveSettingsButton.textContent = this.t("saveSettings");
+
+      if (!this.refs.partialTranscript.textContent || this.refs.partialTranscript.textContent === MESSAGES.en.waitingForSpeech || this.refs.partialTranscript.textContent === MESSAGES["zh-TW"].waitingForSpeech) {
+        this.refs.partialTranscript.textContent = this.t("waitingForSpeech");
+      }
+
+      if (!this.refs.notesStatus.textContent || this.refs.notesStatus.textContent === MESSAGES.en.ready || this.refs.notesStatus.textContent === MESSAGES["zh-TW"].ready) {
+        this.refs.notesStatus.textContent = this.t("ready");
+      }
+
+      if (!this.refs.speechStatus.textContent || this.refs.speechStatus.textContent === MESSAGES.en.idle || this.refs.speechStatus.textContent === MESSAGES["zh-TW"].idle) {
+        this.refs.speechStatus.textContent = this.t("idle");
+      }
+    },
+
+    bindHandlers(handlers) {
+      this.refs.startButton.addEventListener("click", handlers.onStart);
+      this.refs.stopButton.addEventListener("click", handlers.onStop);
+      this.refs.generateNotesButton.addEventListener("click", handlers.onGenerateNotes);
+      this.refs.settingsButton.addEventListener("click", () => this.openSettings());
+      this.refs.closeSettingsButton.addEventListener("click", () => this.closeSettings());
+      this.refs.newLectureButton.addEventListener("click", handlers.onNewLecture);
+      this.refs.documentInput.addEventListener("change", handlers.onDocumentUpload);
+      this.refs.settingsForm.addEventListener("submit", handlers.onSaveSettings);
+      this.refs.resetSettingsButton.addEventListener("click", handlers.onResetSettings);
+
+      [
+        this.refs.lectureTitleInput,
+        this.refs.courseNameInput,
+        this.refs.lectureTopicInput,
+        this.refs.additionalContextInput,
+        this.refs.interfaceLanguageSelect,
+      ].forEach((element) => {
+        element.addEventListener("input", handlers.onLectureMetadataChange);
+      });
+    },
+
+    openSettings() {
+      this.refs.settingsDialog.showModal();
+    },
+
+    closeSettings() {
+      this.refs.settingsDialog.close();
+    },
+
+    getLectureFormData() {
+      return {
+        title: this.refs.lectureTitleInput.value.trim(),
+        courseName: this.refs.courseNameInput.value.trim(),
+        topic: this.refs.lectureTopicInput.value.trim(),
+        additionalContext: this.refs.additionalContextInput.value.trim(),
+        interfaceLanguage: this.refs.interfaceLanguageSelect.value,
+      };
+    },
+
+    setLectureFormData(lecture) {
+      const safeLecture = lecture || {};
+      this.refs.lectureTitleInput.value = safeLecture.title || "";
+      this.refs.courseNameInput.value = safeLecture.courseName || "";
+      this.refs.lectureTopicInput.value = safeLecture.topic || "";
+      this.refs.additionalContextInput.value = safeLecture.additionalContext || "";
+      this.refs.interfaceLanguageSelect.value = safeLecture.interfaceLanguage || "en";
+    },
+
+    setSettingsForm(settings) {
+      this.refs.azureKeyInput.value = settings.azureKey || "";
+      this.refs.azureRegionInput.value = settings.azureRegion || "";
+      this.refs.geminiKeyInput.value = settings.geminiKey || "";
+      this.refs.recognitionLanguagesInput.value = (settings.recognitionLanguages || []).join(", ");
+      this.refs.segmentIntervalInput.value = settings.segmentIntervalMinutes || 3;
+      this.refs.settingsLanguageInput.value = settings.interfaceLanguage || "en";
+      this.refs.interfaceLanguageSelect.value = settings.interfaceLanguage || "en";
+      this.setLanguage(settings.interfaceLanguage || "en");
+    },
+
+    getSettingsFormData() {
+      return {
+        azureKey: this.refs.azureKeyInput.value.trim(),
+        azureRegion: this.refs.azureRegionInput.value.trim(),
+        geminiKey: this.refs.geminiKeyInput.value.trim(),
+        recognitionLanguages: this.refs.recognitionLanguagesInput.value,
+        segmentIntervalMinutes: Number(this.refs.segmentIntervalInput.value),
+        interfaceLanguage: this.refs.settingsLanguageInput.value,
+      };
+    },
+
+    setRecordingState(isRecording) {
+      this.refs.startButton.disabled = isRecording;
+      this.refs.stopButton.disabled = !isRecording;
+    },
+
+    setSpeechStatus(message) {
+      const reconnectMatch = /^Reconnecting in (\d+)s$/i.exec(message || "");
+      if (reconnectMatch) {
+        this.refs.speechStatus.textContent = this.currentLanguage === "zh-TW" ? `${reconnectMatch[1]} 秒後重新連線` : `Reconnecting in ${reconnectMatch[1]}s`;
+        return;
+      }
+
+      const known = {
+        Listening: this.t("listening"),
+        Idle: this.t("idle"),
+        Error: this.t("error"),
+        Stopped: this.t("stopped"),
+        Reconnected: this.currentLanguage === "zh-TW" ? "已重新連線" : "Reconnected",
+        "Session stopped.": this.currentLanguage === "zh-TW" ? "工作階段已停止" : "Session stopped.",
+      };
+
+      if (known[message]) {
+        this.refs.speechStatus.textContent = known[message];
+        return;
+      }
+
+      if ((message || "").startsWith("Canceled:")) {
+        this.refs.speechStatus.textContent = this.currentLanguage === "zh-TW" ? `已取消：${message.slice("Canceled:".length).trim()}` : message;
+        return;
+      }
+
+      this.refs.speechStatus.textContent = message;
+    },
+
+    setNotesStatus(message) {
+      this.refs.notesStatus.textContent = message;
+    },
+
+    setRecoveryMessage(message) {
+      this.refs.recoveryMessage.textContent = message;
+    },
+
+    renderTranscript(transcriptHtml) {
+      this.refs.transcriptContainer.innerHTML = transcriptHtml;
+      this.refs.transcriptContainer.scrollTop = this.refs.transcriptContainer.scrollHeight;
+    },
+
+    renderTerms(terms) {
+      if (!terms || !terms.length) {
+        this.refs.termList.innerHTML = `<span class="rounded-full border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-500">${window.TranscriptProcessor.escapeHtml(this.t("noTermsDetectedYet"))}</span>`;
+        return;
+      }
+
+      this.refs.termList.innerHTML = terms
+        .map((term) => `<span class="rounded-full border border-zinc-300 bg-white px-3 py-1 text-xs font-semibold tracking-wide text-zinc-700">${window.TranscriptProcessor.escapeHtml(term)}</span>`)
+        .join("");
+    },
+
+    renderPartial(text) {
+      this.refs.partialTranscript.textContent = text || this.t("waitingForSpeech");
+    },
+
+    renderNotes(markdown) {
+      this.refs.notesContainer.textContent = markdown || this.t("defaultNotes");
+    },
+
+    renderDocuments(documents) {
+      if (!documents || !documents.length) {
+        this.refs.documentList.innerHTML = `<p class="text-sm text-zinc-500">${window.TranscriptProcessor.escapeHtml(this.t("noDocumentsUploaded"))}</p>`;
+        return;
+      }
+
+      this.refs.documentList.innerHTML = documents
+        .map(
+          (document) => `
+            <div class="rounded-2xl border border-zinc-200 bg-white p-3 text-sm text-zinc-700">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <p class="font-semibold">${window.TranscriptProcessor.escapeHtml(document.name)}</p>
+                  <p class="text-xs text-zinc-500">${window.TranscriptProcessor.escapeHtml(document.type.toUpperCase())} · ${formatBytes(document.size)}</p>
+                </div>
+              </div>
+            </div>
+          `
+        )
+        .join("");
+    },
+
+    renderLectureSummary(lecture, isRecording) {
+      const title = (lecture && lecture.title) || this.t("untitledLecture");
+      const date = lecture && lecture.date ? lecture.date : null;
+      const duration = lecture && typeof lecture.durationMs === "number" ? lecture.durationMs : 0;
+
+      this.refs.lectureTitleDisplay.textContent = title;
+      this.refs.lectureMetaDate.textContent = formatDate(date, this.currentLanguage);
+      this.refs.lectureMetaDuration.textContent = formatDuration(duration);
+      this.setRecordingState(Boolean(isRecording));
+    },
+
+    renderHistory(lectures, activeLectureId, onSelect) {
+      if (!lectures.length) {
+        this.refs.historyList.innerHTML = `<div class="rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 p-4 text-sm text-zinc-500">${window.TranscriptProcessor.escapeHtml(this.t("noLecturesSavedYet"))}</div>`;
+        return;
+      }
+
+      this.refs.historyList.innerHTML = lectures
+        .map(
+          (lecture) => `
+            <button data-lecture-id="${lecture.id}" data-active="${lecture.id === activeLectureId}" class="history-card w-full rounded-2xl border border-zinc-200 bg-zinc-50 p-4 text-left">
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-steel">${formatDate(lecture.date, this.currentLanguage)}</p>
+              <h3 class="mt-2 text-base font-semibold text-zinc-900">${window.TranscriptProcessor.escapeHtml(lecture.title || this.t("untitledLecture"))}</h3>
+              <div class="mt-3 flex items-center gap-2 text-xs text-zinc-500">
+                <span>${formatDuration(lecture.durationMs || 0)}</span>
+                <span>•</span>
+                <span>${lecture.notes ? this.t("notesReady") : this.t("transcriptOnly")}</span>
+              </div>
+            </button>
+          `
+        )
+        .join("");
+
+      this.refs.historyList.querySelectorAll("[data-lecture-id]").forEach((button) => {
+        button.addEventListener("click", () => onSelect(button.getAttribute("data-lecture-id")));
+      });
+    },
+
+    showToast(message, tone) {
+      const toast = document.createElement("div");
+      toast.className = `pointer-events-auto rounded-2xl border px-4 py-3 text-sm shadow-lg backdrop-blur ${tone === "error" ? "border-red-200 bg-red-50 text-red-700" : "border-zinc-200 bg-white/90 text-zinc-700"}`;
+      toast.textContent = message;
+      this.refs.toastContainer.appendChild(toast);
+
+      window.setTimeout(() => {
+        toast.remove();
+      }, 3600);
+    },
+  };
+
+  window.UI = UI;
+})();

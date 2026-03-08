@@ -147,7 +147,7 @@
 
       function flushParagraph(reason) {
         if (!state.currentParagraphText.trim()) {
-          return null;
+          return { paragraph: null, segment: null };
         }
 
         const paragraph = {
@@ -165,7 +165,10 @@
         state.currentParagraphText = "";
         state.currentParagraphTerms = [];
         state.currentParagraphStart = null;
-        return paragraph;
+        return {
+          paragraph,
+          segment: flushSegment(reason),
+        };
       }
 
       function flushSegment(reason) {
@@ -271,9 +274,13 @@
           const longPause = state.lastResultAt ? resultAt - state.lastResultAt >= settings.pauseThresholdMs : false;
           const charLimitExceeded = state.currentParagraphText.length >= settings.paragraphCharLimit;
           const topicShift = detectTopicShift(state.currentParagraphText, text);
+          let paragraph = null;
+          let segment = null;
 
           if ((longPause || charLimitExceeded || topicShift) && state.currentParagraphText.trim()) {
-            flushParagraph(longPause ? "pause" : topicShift ? "topic-shift" : "length");
+            const finalized = flushParagraph(longPause ? "pause" : topicShift ? "topic-shift" : "length");
+            paragraph = finalized.paragraph;
+            segment = finalized.segment;
           }
 
           const technicalTerms = detectTechnicalTerms(text);
@@ -289,18 +296,17 @@
           state.lastResultAt = resultAt;
           state.partialText = "";
 
-          let paragraph = null;
           const segmentDuration = state.segmentBuffer.length
             ? resultAt - state.segmentBuffer[0].startedAt
             : state.currentParagraphStart
               ? resultAt - state.currentParagraphStart
               : 0;
           const segmentSize = state.segmentBuffer.reduce((total, item) => total + item.text.length, 0) + state.currentParagraphText.length;
-          let segment = null;
 
           if (segmentDuration >= settings.segmentIntervalMs || segmentSize >= settings.segmentCharLimit) {
-            paragraph = flushParagraph(segmentDuration >= settings.segmentIntervalMs ? "segment-interval" : "segment-length");
-            segment = flushSegment(paragraph ? paragraph.reason : "segment");
+            const finalized = flushParagraph(segmentDuration >= settings.segmentIntervalMs ? "segment-interval" : "segment-length");
+            paragraph = finalized.paragraph || paragraph;
+            segment = finalized.segment || segment;
           }
 
           return {
@@ -314,11 +320,10 @@
         },
 
         flushAll() {
-          const paragraph = flushParagraph("finalize");
-          const segment = flushSegment("finalize");
+          const finalized = flushParagraph("finalize");
           return {
-            paragraph,
-            segment,
+            paragraph: finalized.paragraph,
+            segment: finalized.segment,
             transcriptText: this.getTranscriptText(),
             transcriptHtml: this.getHighlightedTranscriptHtml(),
             technicalTerms: this.getTechnicalTerms(),

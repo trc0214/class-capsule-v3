@@ -15,6 +15,7 @@
       const settings = await window.SettingsManager.load();
       window.UI.init();
       window.UI.setSettingsForm(settings);
+      window.UI.setLanguage(settings.interfaceLanguage);
       this.speechService = new window.AzureSpeechService();
       this.transcriptProcessor = window.TranscriptProcessor.create({ segmentIntervalMinutes: settings.segmentIntervalMinutes });
 
@@ -92,7 +93,7 @@
 
     prepareNewLecture() {
       if (this.isRecording) {
-        window.UI.showToast("Stop the current recording before starting a new lecture.", "error");
+        window.UI.showToast(window.UI.t("stopCurrentRecordingFirst"), "error");
         return;
       }
 
@@ -100,13 +101,14 @@
       this.currentDocuments = [];
       this.transcriptProcessor = window.TranscriptProcessor.create({ segmentIntervalMinutes: window.SettingsManager.get().segmentIntervalMinutes });
       window.UI.setLectureFormData(this.currentLecture);
+      window.UI.setLanguage(this.currentLecture.interfaceLanguage || window.SettingsManager.get().interfaceLanguage);
       window.UI.renderDocuments([]);
       window.UI.renderTranscript(this.transcriptProcessor.getHighlightedTranscriptHtml());
       window.UI.renderTerms([]);
       window.UI.renderPartial("");
       window.UI.renderNotes("");
-      window.UI.setSpeechStatus("Idle");
-      window.UI.setNotesStatus("Ready.");
+      window.UI.setSpeechStatus(window.UI.t("idle"));
+      window.UI.setNotesStatus(window.UI.t("ready"));
       this.renderCurrentLecture();
     },
 
@@ -146,7 +148,7 @@
 
     async loadLecture(lectureId) {
       if (this.isRecording) {
-        window.UI.showToast("Stop recording before switching lectures.", "error");
+        window.UI.showToast(window.UI.t("stopRecordingBeforeSwitching"), "error");
         return;
       }
 
@@ -166,6 +168,7 @@
         }
       );
       window.UI.setLectureFormData(lecture);
+      window.UI.setLanguage(lecture.interfaceLanguage || window.SettingsManager.get().interfaceLanguage);
       window.UI.renderPartial("");
       this.renderCurrentLecture();
       await this.refreshLectures(lecture.id);
@@ -174,7 +177,7 @@
     async restoreDraftIfAvailable() {
       const draft = await window.AppStorage.getDraft();
       if (!draft || !draft.lecture) {
-        window.UI.setRecoveryMessage("No pending draft.");
+        window.UI.setRecoveryMessage(window.UI.t("noPendingDraft"));
         return;
       }
 
@@ -183,8 +186,9 @@
       this.transcriptProcessor = window.TranscriptProcessor.create({ segmentIntervalMinutes: window.SettingsManager.get().segmentIntervalMinutes });
       this.transcriptProcessor.restore(draft.transcriptState || {});
       window.UI.setLectureFormData(this.currentLecture);
+      window.UI.setLanguage(this.currentLecture.interfaceLanguage || window.SettingsManager.get().interfaceLanguage);
       this.renderCurrentLecture();
-      window.UI.setRecoveryMessage(`Recovered draft from ${new Date(draft.updatedAt || Date.now()).toLocaleString()}. Recording must be started again manually.`);
+      window.UI.setRecoveryMessage(window.UI.t("recoveredDraft", { time: new Date(draft.updatedAt || Date.now()).toLocaleString(window.UI.currentLanguage === "zh-TW" ? "zh-TW" : "en-US") }));
       await this.refreshLectures(this.currentLecture.id);
     },
 
@@ -242,7 +246,7 @@
       });
 
       if (!isSyncLike) {
-        window.UI.setRecoveryMessage(`Draft autosaved at ${new Date().toLocaleTimeString()}.`);
+        window.UI.setRecoveryMessage(window.UI.t("draftAutosavedAt", { time: new Date().toLocaleTimeString(window.UI.currentLanguage === "zh-TW" ? "zh-TW" : "en-US") }));
       }
     },
 
@@ -260,7 +264,7 @@
       await window.AppStorage.saveLecture(this.currentLecture);
       if (clearDraft) {
         await window.AppStorage.clearDraft();
-        window.UI.setRecoveryMessage("No pending draft.");
+        window.UI.setRecoveryMessage(window.UI.t("noPendingDraft"));
       }
       await this.refreshLectures(this.currentLecture.id);
     },
@@ -293,7 +297,7 @@
     async handleStartRecording() {
       const settings = window.SettingsManager.get();
       if (!settings.azureKey || !settings.azureRegion) {
-        window.UI.showToast("Configure Azure Speech credentials first.", "error");
+        window.UI.showToast(window.UI.t("configureAzureFirst"), "error");
         window.UI.openSettings();
         return;
       }
@@ -319,14 +323,14 @@
         this.currentLecture.date = this.currentLecture.date || Date.now();
         this.startAutosave();
         this.startDurationTicker();
-        window.UI.setSpeechStatus("Listening");
+        window.UI.setSpeechStatus(window.UI.t("listening"));
         this.renderCurrentLecture();
         await this.persistDraft(false);
       } catch (error) {
         console.error(error);
         await this.releaseWakeLock();
         window.UI.showToast(error.message, "error");
-        window.UI.setSpeechStatus("Error");
+        window.UI.setSpeechStatus(window.UI.t("error"));
       }
     },
 
@@ -342,14 +346,14 @@
       this.stopAutosave();
       this.stopDurationTicker();
       await this.releaseWakeLock();
-      window.UI.setSpeechStatus("Stopped");
+      window.UI.setSpeechStatus(window.UI.t("stopped"));
       window.UI.renderPartial("");
       this.currentLecture.transcriptText = this.transcriptProcessor.getTranscriptText();
       this.currentLecture.technicalTerms = this.transcriptProcessor.getTechnicalTerms();
       this.currentLecture.transcriptState = this.transcriptProcessor.getState();
       this.renderCurrentLecture();
       await this.saveCurrentLecture(true);
-      window.UI.showToast("Lecture saved locally.");
+      window.UI.showToast(window.UI.t("lectureSavedLocally"));
     },
 
     async handleGenerateNotes() {
@@ -358,18 +362,18 @@
       const settings = window.SettingsManager.get();
 
       if (!settings.geminiKey) {
-        window.UI.showToast("Configure Gemini API key first.", "error");
+        window.UI.showToast(window.UI.t("configureGeminiFirst"), "error");
         window.UI.openSettings();
         return;
       }
 
       if (!this.transcriptProcessor.getTranscriptText().trim()) {
-        window.UI.showToast("Transcript is empty. Record or load a lecture first.", "error");
+        window.UI.showToast(window.UI.t("transcriptEmpty"), "error");
         return;
       }
 
       try {
-        window.UI.setNotesStatus("Preparing reference context");
+        window.UI.setNotesStatus(window.UI.t("preparingReferenceContext"));
         const referenceContext = window.RagProcessor.buildContext({
           documents: this.currentDocuments,
           lectureTitle: this.currentLecture.title,
@@ -395,11 +399,11 @@
         this.currentLecture.notes = notes;
         this.currentLecture.updatedAt = Date.now();
         window.UI.renderNotes(notes);
-        window.UI.setNotesStatus("Notes ready");
+        window.UI.setNotesStatus(window.UI.t("notesReady"));
         await this.saveCurrentLecture(false);
       } catch (error) {
         console.error(error);
-        window.UI.setNotesStatus("Generation failed");
+        window.UI.setNotesStatus(window.UI.t("generationFailed"));
         window.UI.showToast(error.message, "error");
       }
     },
@@ -417,7 +421,7 @@
         this.currentLecture.documents = this.currentDocuments;
         window.UI.renderDocuments(this.currentDocuments);
         await this.persistDraft(false);
-        window.UI.showToast(`Added ${parsed.length} reference document${parsed.length > 1 ? "s" : ""}.`);
+        window.UI.showToast(window.UI.t("addedReferenceDocuments", { count: parsed.length, suffix: parsed.length > 1 ? "s" : "" }));
       } catch (error) {
         console.error(error);
         window.UI.showToast(error.message, "error");
@@ -430,23 +434,31 @@
       event.preventDefault();
       const settings = await window.SettingsManager.save(window.UI.getSettingsFormData());
       window.UI.setSettingsForm(settings);
+      window.UI.setLanguage(settings.interfaceLanguage);
+      if (this.currentLecture) {
+        this.currentLecture.interfaceLanguage = settings.interfaceLanguage;
+      }
       const transcriptState = this.transcriptProcessor.getState();
       this.transcriptProcessor = window.TranscriptProcessor.create({ segmentIntervalMinutes: settings.segmentIntervalMinutes });
       if (this.currentLecture) {
         this.transcriptProcessor.restore(transcriptState);
       }
       window.UI.closeSettings();
-      window.UI.showToast("Settings saved locally.");
+      this.renderCurrentLecture();
+      window.UI.showToast(window.UI.t("settingsSavedLocally"));
     },
 
     async handleResetSettings() {
       const settings = await window.SettingsManager.reset();
       window.UI.setSettingsForm(settings);
-      window.UI.showToast("Settings reset.");
+      window.UI.setLanguage(settings.interfaceLanguage);
+      this.renderCurrentLecture();
+      window.UI.showToast(window.UI.t("settingsReset"));
     },
 
     async handleLectureMetadataChange() {
       this.applyFormDataToLecture();
+      window.UI.setLanguage(this.currentLecture.interfaceLanguage || window.SettingsManager.get().interfaceLanguage);
       this.renderCurrentLecture();
       await this.persistDraft(false);
     },

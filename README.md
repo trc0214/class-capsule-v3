@@ -6,16 +6,28 @@ Lecture Assistant is a browser-only lecture transcription and note generation to
 
 ```text
 lecture-assistant/
+├── .env.example
+├── .gitignore
 ├── index.html
-├── style.css
-├── storage.js
-├── settings.js
-├── transcript.js
-├── speech.js
-├── rag.js
-├── gemini.js
-├── ui.js
-├── app.js
+├── assets/
+│   └── styles/
+│       └── style.css
+├── config/
+│   └── local-config.example.js
+├── scripts/
+│   └── generate-local-config.ps1
+├── src/
+│   ├── app.js
+│   ├── core/
+│   │   ├── settings.js
+│   │   ├── storage.js
+│   │   └── transcript.js
+│   ├── services/
+│   │   ├── gemini.js
+│   │   ├── rag.js
+│   │   └── speech.js
+│   └── ui/
+│       └── ui.js
 └── README.md
 ```
 
@@ -36,15 +48,17 @@ Microphone input
 ### Modules
 
 - `index.html`: static app shell, CDN dependencies, and layout.
-- `style.css`: lightweight visual styling beyond Tailwind utilities.
-- `storage.js`: IndexedDB wrapper for lectures, settings, and refresh recovery drafts.
-- `settings.js`: local settings defaults, normalization, and persistence.
-- `transcript.js`: paragraph segmentation, transcript buffering, topic-shift heuristics, technical term detection, and transcript highlighting.
-- `speech.js`: Azure Speech continuous recognition client with reconnect logic and microphone permission handling.
-- `rag.js`: reference document parsing for `.txt`, `.md`, and `.pdf` plus lightweight chunk ranking.
-- `gemini.js`: Gemini API client and hierarchical note generation for long transcripts.
-- `ui.js`: DOM rendering and user interaction helpers.
-- `app.js`: top-level orchestration, autosave, wake lock handling, lecture lifecycle, and module wiring.
+- `assets/styles/style.css`: lightweight visual styling beyond Tailwind utilities.
+- `src/core/storage.js`: IndexedDB wrapper for lectures, settings, and refresh recovery drafts.
+- `src/core/settings.js`: local settings defaults, normalization, and persistence.
+- `src/core/transcript.js`: paragraph segmentation, transcript buffering, topic-shift heuristics, technical term detection, and transcript highlighting.
+- `src/services/speech.js`: Azure Speech continuous recognition client with reconnect logic and microphone permission handling.
+- `src/services/rag.js`: reference document parsing for `.txt`, `.md`, and `.pdf` plus lightweight chunk ranking.
+- `src/services/gemini.js`: Gemini API client and hierarchical note generation for long transcripts.
+- `src/ui/ui.js`: DOM rendering and user interaction helpers.
+- `src/app.js`: top-level orchestration, autosave, wake lock handling, lecture lifecycle, and module wiring.
+- `config/local-config.example.js`: tracked template for local browser config values.
+- `scripts/generate-local-config.ps1`: converts a local `.env` file into `config/local-config.js` for browser use.
 
 ## Features
 
@@ -53,7 +67,7 @@ Microphone input
 - Partial and final transcript display
 - Technical term detection and transcript highlighting
 - Automatic transcript paragraphing on pauses, length limits, and topic-shift cues
-- Segment buffering to support long lectures
+- Immediate segment storage whenever a paragraph is finalized, with a fallback interval for unusually long uninterrupted speech
 - Autosave every 10 seconds
 - Refresh recovery for in-progress drafts
 - Local lecture history stored in IndexedDB
@@ -98,6 +112,17 @@ These provide the most reliable support for:
 
 No build step is required.
 
+### Optional: keep keys in local files instead of retyping them
+
+Because this app runs entirely in the browser, a true server-side `.env` secret model is not possible. The browser must still receive the keys in order to call Azure Speech and Gemini directly.
+
+The supported local workflow is:
+
+- Copy `.env.example` to `.env` and fill in your keys.
+- Run `pwsh -ExecutionPolicy Bypass -File .\scripts\generate-local-config.ps1`.
+- This creates `config/local-config.js`, which is ignored by git.
+- Open `index.html` and the settings form will be prefilled from that local file.
+
 1. Open `index.html` in the browser.
 2. Open `Settings`.
 3. Enter:
@@ -112,7 +137,12 @@ No build step is required.
 
 ## How To Configure API Keys
 
-All keys are configured inside the in-app `Settings` dialog and saved only in the current browser using local persistence.
+Keys can be supplied in either of two ways:
+
+1. Through the in-app `Settings` dialog, which saves them in the current browser.
+2. Through a local `.env` file converted into `config/local-config.js`, which keeps them out of the committed source tree.
+
+If `config/local-config.js` provides a field, it overrides the browser-stored value for that field.
 
 Fields:
 
@@ -120,7 +150,7 @@ Fields:
 - `Azure Region`
 - `Gemini API Key`
 - `Recognition Languages`
-- `Segment Interval`
+- `Segment Interval Fallback`
 - `Interface Language`
 
 ## Transcript Reliability Design
@@ -129,7 +159,8 @@ Fields:
 - Autosave draft every 10 seconds into IndexedDB and `localStorage`
 - Refresh recovery for the active lecture draft
 - Wake Lock request during active recording when supported by the browser
-- Transcript paragraph buffering and segment flushing to reduce single-buffer growth during long lectures
+- Transcript paragraph buffering with immediate segment flushes on natural speech breaks
+- Time-based fallback segment flushing to cap buffer growth during long uninterrupted speech
 
 ## Note Generation Strategy
 
@@ -212,4 +243,6 @@ Each lecture record contains:
 ## Notes
 
 - Opening `index.html` directly is supported because the app uses classic script tags rather than ES module imports.
+- `dotenv` itself cannot securely protect secrets inside a pure static browser app because the client must still receive those values. The local `.env` to `config/local-config.js` flow is for convenience and keeping secrets out of git, not for server-grade secret isolation.
 - Browser file-origin restrictions vary. If your browser blocks microphone or external requests from `file://`, use a simple static file server as a fallback.
+

@@ -32,7 +32,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="style.css" />
+      <link rel="stylesheet" href="assets/styles/style.css" />
   </head>
   <body class="bg-zinc-100 text-ink antialiased">
     <div class="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.95),_rgba(229,231,235,0.8)_45%,_rgba(212,212,216,0.75))]">
@@ -209,7 +209,7 @@ Generated notes will appear here.</div>
           </label>
 
           <label class="block rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-            <span class="block text-xs font-semibold uppercase tracking-[0.18em] text-steel">Segment Interval (minutes)</span>
+            <span class="block text-xs font-semibold uppercase tracking-[0.18em] text-steel">Segment Interval Fallback (minutes)</span>
             <input id="segmentIntervalInput" type="number" min="1" max="15" step="1" class="mt-2 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500" />
           </label>
 
@@ -223,7 +223,7 @@ Generated notes will appear here.</div>
         </div>
 
         <div class="flex items-center justify-between border-t border-zinc-200 p-6">
-          <p class="text-sm text-steel">Keys are stored only in this browser.</p>
+          <p class="text-sm text-steel">Keys can come from browser storage or config/local-config.js.</p>
           <div class="flex gap-2">
             <button type="button" id="resetSettingsButton" class="rounded-full border border-zinc-300 px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:border-zinc-800 hover:text-zinc-900">Reset</button>
             <button type="submit" id="saveSettingsButton" value="default" class="rounded-full bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-black">Save Settings</button>
@@ -239,13 +239,17 @@ Generated notes will appear here.</div>
         window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js";
       }
     </script>
-    <script src="storage.js"></script>
-    <script src="settings.js"></script>
-    <script src="transcript.js"></script>
-    <script src="speech.js"></script>
-    <script src="rag.js"></script>
-    <script src="gemini.js"></script>
-    <script src="ui.js"></script>
-    <script src="app.js"></script>
+    <script>
+      window.LECTURE_ASSISTANT_LOCAL_CONFIG = window.LECTURE_ASSISTANT_LOCAL_CONFIG || {};
+    </script>
+    <script src="config/local-config.js"></script>
+    <script src="src/core/storage.js"></script>
+    <script src="src/core/settings.js"></script>
+    <script src="src/core/transcript.js"></script>
+    <script src="src/services/speech.js"></script>
+    <script src="src/services/rag.js"></script>
+    <script src="src/services/gemini.js"></script>
+    <script src="src/ui/ui.js"></script>
+    <script src="src/app.js"></script>
   </body>
 </html>

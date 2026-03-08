@@ -37,27 +37,59 @@
   <body class="bg-zinc-100 text-ink antialiased">
     <div class="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.95),_rgba(229,231,235,0.8)_45%,_rgba(212,212,216,0.75))]">
       <div class="mx-auto flex min-h-screen max-w-[1800px] gap-4 p-4 lg:p-6">
-        <aside class="flex w-full max-w-sm flex-col rounded-3xl border border-zinc-300/80 bg-white/85 p-4 shadow-panel backdrop-blur lg:w-80">
-          <div class="mb-4 flex items-center justify-between border-b border-zinc-200 pb-4">
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.3em] text-steel">Lecture Assistant</p>
-              <h1 class="mt-2 text-2xl font-semibold text-ink">Sessions</h1>
+        <aside id="sidebar" class="flex w-full max-w-sm flex-col rounded-3xl border border-zinc-300/80 bg-white/85 p-4 shadow-panel backdrop-blur lg:w-80 transition-all duration-300">
+          <div class="sidebar-shell flex h-full min-h-0 flex-col">
+            <div class="sidebar-top mb-4 border-b border-zinc-200 pb-4">
+              <div class="flex items-start justify-between gap-3">
+                <div id="sidebarHeader" class="min-w-0 sidebar-full-block">
+                  <p class="sidebar-title text-xs font-semibold uppercase tracking-[0.3em] text-steel">Lecture Assistant</p>
+                  <h1 class="sidebar-title mt-2 text-2xl font-semibold text-ink">Sessions</h1>
+                </div>
+                <button id="expandSidebarButton" class="sidebar-icon-btn sidebar-toggle-btn" title="Expand/collapse menu" aria-label="Collapse sidebar" aria-pressed="false">
+                  <span id="expandIcon">⮜</span>
+                </button>
+              </div>
+              <div class="sidebar-full-block mt-4 flex gap-2">
+                <button id="newLectureButton" class="flex-1 rounded-full border border-zinc-300 px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-700 transition hover:border-zinc-800 hover:text-zinc-900">
+                  New
+                </button>
+              </div>
             </div>
-            <button id="newLectureButton" class="rounded-full border border-zinc-300 px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-700 transition hover:border-zinc-800 hover:text-zinc-900">
-              New
-            </button>
-          </div>
 
-          <div class="mb-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-3 text-xs text-steel">
-            <p class="font-semibold uppercase tracking-[0.18em] text-zinc-700">Recovery</p>
-            <p id="recoveryMessage" class="mt-2 leading-5">No pending draft.</p>
-          </div>
+            <div id="sidebarRecovery" class="sidebar-full-block mb-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-3 text-xs text-steel">
+              <p class="font-semibold uppercase tracking-[0.18em] text-zinc-700">Recovery</p>
+              <p id="recoveryMessage" class="mt-2 leading-5">No pending draft.</p>
+            </div>
 
-          <div id="historyList" class="custom-scrollbar flex-1 space-y-3 overflow-y-auto pr-1"></div>
+            <div class="sidebar-full-block mb-3 flex items-center justify-between">
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-steel">Recent Sessions</p>
+              <button id="sidebarSettingsButton" class="rounded-full border border-zinc-300 px-2.5 py-2 text-xs font-semibold text-zinc-700 transition hover:border-zinc-800 hover:text-zinc-900" title="Settings" aria-label="Open settings">
+                ⚙
+              </button>
+            </div>
+
+            <div id="historyList" class="sidebar-full-block custom-scrollbar flex-1 space-y-3 overflow-y-auto pr-1"></div>
+
+            <div id="sidebarCompactPanel" class="sidebar-compact-panel" aria-hidden="true">
+              <div class="sidebar-compact-actions">
+                <button id="collapsedExpand" class="sidebar-icon-btn sidebar-toggle-btn" title="Expand sidebar" aria-label="Expand sidebar" aria-pressed="true">
+                  <span aria-hidden="true">⮞</span>
+                </button>
+                <button id="collapsedNewLecture" class="sidebar-icon-btn" title="New Lecture" aria-label="New lecture">
+                  <span aria-hidden="true">＋</span>
+                </button>
+                <button id="collapsedSettings" class="sidebar-icon-btn" title="Settings" aria-label="Open settings">
+                  <span aria-hidden="true">⚙</span>
+                </button>
+              </div>
+              <div id="compactHistoryList" class="custom-scrollbar sidebar-compact-history"></div>
+            </div>
+          </div>
         </aside>
 
-        <main class="grid min-h-[90vh] flex-1 grid-cols-1 gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-          <section class="flex min-h-[50vh] flex-col rounded-3xl border border-zinc-300/80 bg-white/90 shadow-panel backdrop-blur">
+        <div id="resizer-sidebar" class="resizer" data-resizer="sidebar"></div>
+        <main id="mainArea" class="flex flex-1 min-h-[90vh] gap-0">
+          <section id="transcriptSection" class="flex min-h-[50vh] flex-col rounded-3xl border border-zinc-300/80 bg-white/90 shadow-panel backdrop-blur flex-1">
             <header class="flex flex-col gap-4 border-b border-zinc-200 p-5 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <p class="text-xs font-semibold uppercase tracking-[0.3em] text-steel">Live Transcript</p>
@@ -150,7 +182,8 @@
             </div>
           </section>
 
-          <section class="flex min-h-[50vh] flex-col rounded-3xl border border-zinc-300/80 bg-white/90 shadow-panel backdrop-blur">
+          <div id="resizer-notes" class="resizer" data-resizer="notes"></div>
+          <section id="notesSection" class="flex min-h-[50vh] flex-col rounded-3xl border border-zinc-300/80 bg-white/90 shadow-panel backdrop-blur flex-1">
             <header class="border-b border-zinc-200 p-5">
               <p class="text-xs font-semibold uppercase tracking-[0.3em] text-steel">AI Notes</p>
               <h2 class="mt-2 text-2xl font-semibold text-ink">Markdown lecture notes</h2>

@@ -174,6 +174,7 @@
   const UI = {
     refs: {},
     currentLanguage: "en",
+    sidebarExpandedWidth: null,
 
     init() {
       this.refs = {
@@ -214,6 +215,10 @@
         generateNotesButton: document.getElementById("generateNotesButton"),
         settingsButton: document.getElementById("settingsButton"),
         newLectureButton: document.getElementById("newLectureButton"),
+        sidebarSettingsButton: document.getElementById("sidebarSettingsButton"),
+        expandSidebarButton: document.getElementById("expandSidebarButton"),
+        collapsedExpandButton: document.getElementById("collapsedExpand"),
+        compactHistoryList: document.getElementById("compactHistoryList"),
         settingsDialog: document.getElementById("settingsDialog"),
         settingsForm: document.getElementById("settingsForm"),
         closeSettingsButton: document.getElementById("closeSettingsButton"),
@@ -258,6 +263,10 @@
       this.refs.appTitle.textContent = this.t("appTitle");
       this.refs.sessionsTitle.textContent = this.t("sessions");
       this.refs.newLectureButton.textContent = this.t("new");
+      if (this.refs.sidebarSettingsButton) {
+        this.refs.sidebarSettingsButton.title = this.t("settings");
+        this.refs.sidebarSettingsButton.setAttribute("aria-label", this.t("settings"));
+      }
       this.refs.recoveryTitle.textContent = this.t("recovery");
       this.refs.liveTranscriptLabel.textContent = this.t("liveTranscript");
       this.refs.startButton.textContent = this.t("startRecording");
@@ -296,6 +305,25 @@
       this.refs.resetSettingsButton.textContent = this.t("reset");
       this.refs.saveSettingsButton.textContent = this.t("saveSettings");
 
+      if (this.refs.expandSidebarButton) {
+        this.refs.expandSidebarButton.title = this.currentLanguage === "zh-TW" ? "展開或收合側邊欄" : "Expand or collapse sidebar";
+        this.refs.expandSidebarButton.setAttribute("aria-label", this.currentLanguage === "zh-TW" ? "收合側邊欄" : "Collapse sidebar");
+      }
+      if (this.refs.collapsedExpandButton) {
+        this.refs.collapsedExpandButton.title = this.currentLanguage === "zh-TW" ? "展開側邊欄" : "Expand sidebar";
+        this.refs.collapsedExpandButton.setAttribute("aria-label", this.refs.collapsedExpandButton.title);
+      }
+      const collapsedNewLecture = document.getElementById("collapsedNewLecture");
+      const collapsedSettings = document.getElementById("collapsedSettings");
+      if (collapsedNewLecture) {
+        collapsedNewLecture.title = this.currentLanguage === "zh-TW" ? "新增講座" : "New lecture";
+        collapsedNewLecture.setAttribute("aria-label", collapsedNewLecture.title);
+      }
+      if (collapsedSettings) {
+        collapsedSettings.title = this.t("settings");
+        collapsedSettings.setAttribute("aria-label", this.t("settings"));
+      }
+
       if (!this.refs.partialTranscript.textContent || this.refs.partialTranscript.textContent === MESSAGES.en.waitingForSpeech || this.refs.partialTranscript.textContent === MESSAGES["zh-TW"].waitingForSpeech) {
         this.refs.partialTranscript.textContent = this.t("waitingForSpeech");
       }
@@ -314,6 +342,7 @@
       this.refs.stopButton.addEventListener("click", handlers.onStop);
       this.refs.generateNotesButton.addEventListener("click", handlers.onGenerateNotes);
       this.refs.settingsButton.addEventListener("click", () => this.openSettings());
+      this.refs.sidebarSettingsButton.addEventListener("click", () => this.openSettings());
       this.refs.closeSettingsButton.addEventListener("click", () => this.closeSettings());
       this.refs.newLectureButton.addEventListener("click", handlers.onNewLecture);
       this.refs.documentInput.addEventListener("change", handlers.onDocumentUpload);
@@ -329,6 +358,123 @@
       ].forEach((element) => {
         element.addEventListener("input", handlers.onLectureMetadataChange);
       });
+
+      // Sidebar expand/collapse
+      const sidebar = document.getElementById("sidebar");
+      const expandBtn = this.refs.expandSidebarButton;
+      expandBtn && expandBtn.addEventListener("click", () => {
+        this.setSidebarCollapsed(!sidebar.classList.contains("collapsed"));
+      });
+
+      const collapsedNewLecture = document.getElementById("collapsedNewLecture");
+      const collapsedSettings = document.getElementById("collapsedSettings");
+      if (collapsedNewLecture) {
+        collapsedNewLecture.addEventListener("click", handlers.onNewLecture);
+      }
+      if (collapsedSettings) collapsedSettings.addEventListener("click", () => {
+        this.setSidebarCollapsed(false);
+        this.openSettings();
+      });
+      if (this.refs.collapsedExpandButton) this.refs.collapsedExpandButton.addEventListener("click", () => {
+        this.setSidebarCollapsed(false);
+      });
+
+      const setupResizer = (resizerId, leftId, rightId, minLeft, minRight) => {
+        const resizer = document.getElementById(resizerId);
+        const left = document.getElementById(leftId);
+        const right = document.getElementById(rightId);
+        let dragging = false;
+        let startX = 0;
+        let startLeftWidth = 0;
+        let startRightWidth = 0;
+        resizer.addEventListener("mousedown", (e) => {
+          dragging = true;
+          startX = e.clientX;
+          startLeftWidth = left.offsetWidth;
+          startRightWidth = right.offsetWidth;
+          document.body.style.cursor = "ew-resize";
+        });
+        document.addEventListener("mousemove", (e) => {
+          if (!dragging) return;
+          const dx = e.clientX - startX;
+          if (resizerId === "resizer-sidebar") {
+            this.setSidebarCollapsed(false);
+            let newWidth = Math.max(minLeft, startLeftWidth + dx);
+            this.sidebarExpandedWidth = newWidth;
+            left.style.maxWidth = newWidth + "px";
+            left.style.minWidth = newWidth + "px";
+            left.style.width = newWidth + "px";
+          } else {
+            const newLeft = Math.max(minLeft, startLeftWidth + dx);
+            const newRight = Math.max(minRight, startRightWidth - dx);
+            left.style.flexBasis = newLeft + "px";
+            right.style.flexBasis = newRight + "px";
+          }
+        });
+        document.addEventListener("mouseup", () => {
+          if (dragging) {
+            dragging = false;
+            document.body.style.cursor = "";
+          }
+        });
+      };
+      setupResizer("resizer-sidebar", "sidebar", "mainArea", 220, 300);
+      setupResizer("resizer-notes", "transcriptSection", "notesSection", 240, 240);
+
+      window.addEventListener("resize", () => {
+        if (window.innerWidth < 1024) {
+          this.setSidebarCollapsed(false);
+        }
+      });
+    },
+
+    setSidebarCollapsed(collapsed) {
+      const sidebar = document.getElementById("sidebar");
+      if (!sidebar) {
+        return;
+      }
+
+      if (window.innerWidth < 1024) {
+        sidebar.classList.remove("collapsed");
+        sidebar.style.width = "";
+        sidebar.style.minWidth = "";
+        sidebar.style.maxWidth = "";
+        if (this.refs.expandSidebarButton) {
+          this.refs.expandSidebarButton.setAttribute("aria-pressed", "false");
+          this.refs.expandSidebarButton.setAttribute("aria-label", this.currentLanguage === "zh-TW" ? "側邊欄" : "Sidebar");
+        }
+        if (this.refs.collapsedExpandButton) {
+          this.refs.collapsedExpandButton.setAttribute("aria-pressed", "false");
+        }
+        return;
+      }
+
+      if (collapsed) {
+        if (!sidebar.classList.contains("collapsed")) {
+          this.sidebarExpandedWidth = sidebar.offsetWidth || this.sidebarExpandedWidth || 320;
+        }
+        sidebar.classList.add("collapsed");
+        sidebar.style.width = "";
+        sidebar.style.minWidth = "";
+        sidebar.style.maxWidth = "";
+      } else {
+        sidebar.classList.remove("collapsed");
+        const width = this.sidebarExpandedWidth || 320;
+        sidebar.style.width = `${width}px`;
+        sidebar.style.minWidth = `${width}px`;
+        sidebar.style.maxWidth = `${width}px`;
+      }
+
+      if (this.refs.expandSidebarButton) {
+        this.refs.expandSidebarButton.setAttribute("aria-pressed", collapsed ? "true" : "false");
+        this.refs.expandSidebarButton.title = collapsed ? (this.currentLanguage === "zh-TW" ? "展開側邊欄" : "Expand sidebar") : (this.currentLanguage === "zh-TW" ? "收合側邊欄" : "Collapse sidebar");
+        this.refs.expandSidebarButton.setAttribute("aria-label", collapsed ? (this.currentLanguage === "zh-TW" ? "展開側邊欄" : "Expand sidebar") : (this.currentLanguage === "zh-TW" ? "收合側邊欄" : "Collapse sidebar"));
+      }
+      if (this.refs.collapsedExpandButton) {
+        this.refs.collapsedExpandButton.setAttribute("aria-pressed", collapsed ? "true" : "false");
+        this.refs.collapsedExpandButton.title = this.currentLanguage === "zh-TW" ? "展開側邊欄" : "Expand sidebar";
+        this.refs.collapsedExpandButton.setAttribute("aria-label", this.refs.collapsedExpandButton.title);
+      }
     },
 
     openSettings() {
@@ -482,6 +628,9 @@
     renderHistory(lectures, activeLectureId, onSelect) {
       if (!lectures.length) {
         this.refs.historyList.innerHTML = `<div class="rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 p-4 text-sm text-zinc-500">${window.TranscriptProcessor.escapeHtml(this.t("noLecturesSavedYet"))}</div>`;
+        if (this.refs.compactHistoryList) {
+          this.refs.compactHistoryList.innerHTML = `<div class="text-center text-[11px] leading-4 text-zinc-400">${window.TranscriptProcessor.escapeHtml(this.currentLanguage === "zh-TW" ? "尚無" : "Empty")}</div>`;
+        }
         return;
       }
 
@@ -501,9 +650,30 @@
         )
         .join("");
 
+      if (this.refs.compactHistoryList) {
+        this.refs.compactHistoryList.innerHTML = lectures
+          .map((lecture) => {
+            const title = lecture.title || this.t("untitledLecture");
+            const initials = title
+              .split(/\s+/)
+              .filter(Boolean)
+              .slice(0, 2)
+              .map((part) => part[0])
+              .join("") || "L";
+            return `<button data-compact-lecture-id="${lecture.id}" data-active="${lecture.id === activeLectureId}" class="sidebar-compact-history-btn" title="${window.TranscriptProcessor.escapeHtml(title)}">${window.TranscriptProcessor.escapeHtml(initials)}</button>`;
+          })
+          .join("");
+      }
+
       this.refs.historyList.querySelectorAll("[data-lecture-id]").forEach((button) => {
         button.addEventListener("click", () => onSelect(button.getAttribute("data-lecture-id")));
       });
+
+      if (this.refs.compactHistoryList) {
+        this.refs.compactHistoryList.querySelectorAll("[data-compact-lecture-id]").forEach((button) => {
+          button.addEventListener("click", () => onSelect(button.getAttribute("data-compact-lecture-id")));
+        });
+      }
     },
 
     showToast(message, tone) {

@@ -40,6 +40,7 @@ Microphone input
 -> partial transcript display
 -> finalized transcript events
 -> transcript paragraph and segment buffer
+-> optional uploaded audio or video transcription stream
 -> IndexedDB draft autosave
 -> lecture history database
 -> Gemini hierarchical summarization
@@ -63,6 +64,7 @@ Microphone input
 ## Features
 
 - Real-time continuous lecture transcription in the browser
+- Upload audio or video files and transcribe them in-browser without using the microphone
 - Mixed-language speech recognition configuration for English and Traditional Chinese
 - Partial and final transcript display
 - Technical term detection and transcript highlighting
@@ -134,6 +136,16 @@ The supported local workflow is:
 5. Click `Start Recording`.
 6. Click `Stop Recording` when the lecture ends.
 7. Click `Generate Notes` to create Markdown lecture notes.
+
+### Optional: transcribe a recorded lecture later
+
+If your laptop battery dies during class, you can still recover by uploading a saved recording afterward.
+
+1. Open `index.html` in Chrome or Edge.
+2. Enter Azure Speech settings.
+3. Use the `Uploaded Media` card to choose an audio or video file.
+4. Wait for browser-side playback transcription to finish.
+5. Review the generated transcript and then click `Generate Notes`.
 
 ## How To Configure API Keys
 
@@ -222,6 +234,13 @@ Each lecture record contains:
 - Keep the tab active when possible.
 - Ensure the device remains online.
 - If Wake Lock is unsupported, prevent the laptop from sleeping manually.
+
+### Uploaded media transcription does not start
+
+- Use Chrome or Edge so the browser can decode and stream the file reliably.
+- Prefer common formats such as `.mp3`, `.wav`, `.m4a`, `.mp4`, or `.webm`.
+- Some video containers may load but expose no readable audio track to the browser.
+- Keep the tab open until the uploaded file finishes transcribing.
 
 ### PDF upload fails
 

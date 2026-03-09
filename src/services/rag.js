@@ -1,4 +1,17 @@
 (function () {
+  const PDFJS_FALLBACKS = [
+    {
+      scriptUrl: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js",
+      workerUrl: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js",
+    },
+    {
+      scriptUrl: "https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js",
+      workerUrl: "https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js",
+    },
+  ];
+
+  let pdfJsLoadPromise = null;
+
   function splitIntoChunks(text, maxChars) {
     const chunks = [];
     let index = 0;
@@ -28,13 +41,87 @@
     return score;
   }
 
-  async function extractPdfText(file) {
-    if (!window.pdfjsLib) {
-      throw new Error("PDF support failed to load.");
+  function getPdfJsApi() {
+    return window.pdfjsLib || window["pdfjs-dist/build/pdf"] || null;
+  }
+
+  function configurePdfWorker(pdfjsLib) {
+    if (!pdfjsLib || !pdfjsLib.GlobalWorkerOptions) {
+      return;
     }
 
+    const existingWorker = pdfjsLib.GlobalWorkerOptions.workerSrc;
+    if (existingWorker) {
+      return;
+    }
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_FALLBACKS[0].workerUrl;
+  }
+
+  function loadScript(url) {
+    return new Promise((resolve, reject) => {
+      const existingScript = document.querySelector(`script[src="${url}"]`);
+      if (existingScript) {
+        if (getPdfJsApi()) {
+          resolve();
+          return;
+        }
+
+        existingScript.addEventListener("load", () => resolve(), { once: true });
+        existingScript.addEventListener("error", () => reject(new Error(`Failed to load script: ${url}`)), { once: true });
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.src = url;
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error(`Failed to load script: ${url}`));
+      document.head.appendChild(script);
+    });
+  }
+
+  async function ensurePdfJsLoaded() {
+    const loadedApi = getPdfJsApi();
+    if (loadedApi) {
+      configurePdfWorker(loadedApi);
+      return loadedApi;
+    }
+
+    if (!pdfJsLoadPromise) {
+      pdfJsLoadPromise = (async () => {
+        let lastError = null;
+
+        for (const candidate of PDFJS_FALLBACKS) {
+          try {
+            await loadScript(candidate.scriptUrl);
+            const pdfjsLib = getPdfJsApi();
+            if (pdfjsLib) {
+              pdfjsLib.GlobalWorkerOptions.workerSrc = candidate.workerUrl;
+              return pdfjsLib;
+            }
+          } catch (error) {
+            lastError = error;
+          }
+        }
+
+        throw lastError || new Error("PDF support failed to load.");
+      })();
+    }
+
+    try {
+      return await pdfJsLoadPromise;
+    } catch (error) {
+      pdfJsLoadPromise = null;
+      throw error;
+    }
+  }
+
+  async function extractPdfText(file) {
+    const pdfjsLib = await ensurePdfJsLoaded();
+
     const bytes = await file.arrayBuffer();
-    const documentTask = window.pdfjsLib.getDocument({ data: bytes });
+    const documentTask = pdfjsLib.getDocument({ data: bytes });
     const pdf = await documentTask.promise;
     const pageTexts = [];
 

@@ -67,6 +67,7 @@ Microphone input
 - Upload audio or video files and transcribe them in-browser without using the microphone
 - Optional primary lecture language setting that forces speech and note generation to use one language, with auto-detect as the fallback
 - Mixed-language speech recognition configuration for English and Traditional Chinese
+- Microphone preprocessing with browser echo cancellation, noise suppression, auto gain control, frequency filtering, compression, and silence gating before Azure Speech recognition
 - Partial and final transcript display
 - Technical term detection and transcript highlighting
 - Automatic transcript paragraphing on pauses, length limits, and topic-shift cues

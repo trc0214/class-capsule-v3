@@ -12,6 +12,7 @@
       isRecording: false,
       activeCaptureMode: null,
       activeMediaInfo: null,
+      audioQualityIssue: null,
 
       async init() {
         await window.AppStorage.init();
@@ -56,7 +57,27 @@
             this.renderCurrentLecture();
           },
           onStatus: (message) => {
+            if ((message === "Listening" || message === "Reconnected") && this.audioQualityIssue && this.activeCaptureMode === "microphone") {
+              window.UI.setSpeechStatus(this.getAudioQualityStatus(this.audioQualityIssue));
+              return;
+            }
+
             window.UI.setSpeechStatus(message);
+          },
+          onAudioQuality: (payload) => {
+            if (this.activeCaptureMode !== "microphone") {
+              return;
+            }
+
+            const nextIssue = payload && payload.issue ? payload.issue : null;
+            if (nextIssue !== this.audioQualityIssue && nextIssue) {
+              window.UI.showToast(this.getAudioQualityToast(nextIssue));
+            }
+
+            this.audioQualityIssue = nextIssue;
+            if (this.isRecording) {
+              window.UI.setSpeechStatus(this.getAudioQualityStatus(nextIssue));
+            }
           },
           onError: (error) => {
             console.error(error);
@@ -113,7 +134,44 @@
         this.currentDocuments = [];
         this.activeCaptureMode = null;
         this.activeMediaInfo = null;
+        this.audioQualityIssue = null;
         this.transcriptProcessor = this.createTranscriptProcessor(null);
+      },
+
+      getAudioQualityStatus(issue) {
+        if (!issue) {
+          return window.UI.t("listening");
+        }
+
+        if (issue === "low-volume") {
+          return window.UI.t("listeningLowVolume");
+        }
+
+        if (issue === "high-noise") {
+          return window.UI.t("listeningHighNoise");
+        }
+
+        if (issue === "clipping") {
+          return window.UI.t("listeningClipping");
+        }
+
+        return window.UI.t("listening");
+      },
+
+      getAudioQualityToast(issue) {
+        if (issue === "low-volume") {
+          return window.UI.t("lowInputVolumeWarning");
+        }
+
+        if (issue === "high-noise") {
+          return window.UI.t("highBackgroundNoiseWarning");
+        }
+
+        if (issue === "clipping") {
+          return window.UI.t("inputClippingWarning");
+        }
+
+        return window.UI.t("listening");
       },
 
       prepareNewLecture() {
@@ -318,6 +376,7 @@
 
         try {
           await this.requestWakeLock();
+          this.audioQualityIssue = null;
           await this.speechService.start({
             azureKey: settings.azureKey,
             azureRegion: settings.azureRegion,
@@ -351,6 +410,7 @@
 
         this.isRecording = false;
         this.activeCaptureMode = null;
+        this.audioQualityIssue = null;
         this.transcriptProcessor.flushAll();
         this.stopAutosave();
         this.stopDurationTicker();

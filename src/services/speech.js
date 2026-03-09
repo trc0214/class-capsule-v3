@@ -1,6 +1,23 @@
 (function () {
-  const MEDIA_SAMPLE_RATE = 16000;
-  const MEDIA_BUFFER_SIZE = 4096;
+  const SPEECH_SAMPLE_RATE = 16000;
+  const AUDIO_BUFFER_SIZE = 4096;
+  const MIC_CONSTRAINTS = {
+    audio: {
+      channelCount: 1,
+      sampleRate: SPEECH_SAMPLE_RATE,
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    },
+  };
+  const QUALITY_REPORT_INTERVAL_MS = 900;
+  const TARGET_SPEECH_RMS = 0.08;
+  const MAX_GAIN = 3.5;
+  const MIN_GAIN = 0.85;
+  const MIN_SIGNAL_RMS = 0.012;
+  const PRE_ROLL_MS = 220;
+  const VAD_START_MS = 180;
+  const VAD_RELEASE_MS = 650;
 
   function ensureSpeechSdk() {
     if (!window.SpeechSDK) {
@@ -36,6 +53,46 @@
     return typeof (config && config.preferredProcessingLanguage) === "string"
       ? config.preferredProcessingLanguage.trim()
       : "";
+  }
+
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function computeRms(samples) {
+    if (!samples || !samples.length) {
+      return 0;
+    }
+
+    let sum = 0;
+    for (let index = 0; index < samples.length; index += 1) {
+      sum += samples[index] * samples[index];
+    }
+
+    return Math.sqrt(sum / samples.length);
+  }
+
+  function computePeak(samples) {
+    if (!samples || !samples.length) {
+      return 0;
+    }
+
+    let peak = 0;
+    for (let index = 0; index < samples.length; index += 1) {
+      peak = Math.max(peak, Math.abs(samples[index]));
+    }
+
+    return peak;
+  }
+
+  function applyGain(samples, gain) {
+    const output = new Float32Array(samples.length);
+
+    for (let index = 0; index < samples.length; index += 1) {
+      output[index] = clamp(samples[index] * gain, -1, 1);
+    }
+
+    return output;
   }
 
   function downmixToMono(inputBuffer) {
@@ -134,6 +191,7 @@
       this.permissionStream = null;
       this.sourceType = null;
       this.mediaState = null;
+      this.microphoneState = null;
       this.mediaCompletionInFlight = null;
     }
 
@@ -146,9 +204,290 @@
         throw new Error("This browser does not support microphone access.");
       }
 
-      this.permissionStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.permissionStream = await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS);
       this.permissionStream.getTracks().forEach((track) => track.stop());
       this.permissionStream = null;
+    }
+
+    buildPushAudioConfig() {
+      const format = window.SpeechSDK.AudioStreamFormat.getWaveFormatPCM(SPEECH_SAMPLE_RATE, 16, 1);
+      const pushStream = window.SpeechSDK.AudioInputStream.createPushStream(format);
+      return {
+        pushStream,
+        audioConfig: window.SpeechSDK.AudioConfig.fromStreamInput(pushStream),
+      };
+    }
+
+    reportAudioQuality(payload) {
+      this.callbacks.onAudioQuality && this.callbacks.onAudioQuality(payload);
+    }
+
+    resolveAudioIssue(metrics, state, frameDurationMs) {
+      const lowVolumeThreshold = Math.max(MIN_SIGNAL_RMS * 0.85, state.noiseFloor * 1.3);
+      const noisyThreshold = 0.018;
+
+      state.lowVolumeMs = metrics.rms < lowVolumeThreshold ? state.lowVolumeMs + frameDurationMs : Math.max(0, state.lowVolumeMs - frameDurationMs * 0.6);
+      state.clippingMs = metrics.peak > 0.98 ? state.clippingMs + frameDurationMs : Math.max(0, state.clippingMs - frameDurationMs);
+      state.highNoiseMs = !state.speechActive && state.noiseFloor > noisyThreshold
+        ? state.highNoiseMs + frameDurationMs
+        : Math.max(0, state.highNoiseMs - frameDurationMs * 0.7);
+
+      if (state.clippingMs >= 180) {
+        return "clipping";
+      }
+
+      if (state.highNoiseMs >= 1800) {
+        return "high-noise";
+      }
+
+      if (state.lowVolumeMs >= 2200) {
+        return "low-volume";
+      }
+
+      return null;
+    }
+
+    maybeReportAudioQuality(state, metrics) {
+      const now = Date.now();
+      if (now - state.lastQualityReportAt < QUALITY_REPORT_INTERVAL_MS && state.lastReportedIssue === state.currentIssue) {
+        return;
+      }
+
+      state.lastQualityReportAt = now;
+      state.lastReportedIssue = state.currentIssue;
+      this.reportAudioQuality({
+        issue: state.currentIssue,
+        rms: metrics.rms,
+        peak: metrics.peak,
+        noiseFloor: state.noiseFloor,
+        isSpeechDetected: state.speechActive,
+        sourceType: this.sourceType,
+      });
+    }
+
+    trimPreRoll(state) {
+      let totalDuration = state.preRoll.reduce((sum, frame) => sum + frame.durationMs, 0);
+      while (state.preRoll.length && totalDuration > PRE_ROLL_MS) {
+        totalDuration -= state.preRoll[0].durationMs;
+        state.preRoll.shift();
+      }
+    }
+
+    writeToPushStream(pushStream, frame) {
+      if (!pushStream || !frame || !frame.buffer) {
+        return;
+      }
+
+      pushStream.write(frame.buffer);
+    }
+
+    async createMicrophoneState() {
+      const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextCtor) {
+        throw new Error("This browser does not support advanced microphone processing.");
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS);
+      const audioContext = new AudioContextCtor({ sampleRate: SPEECH_SAMPLE_RATE });
+      if (audioContext.state === "suspended") {
+        await audioContext.resume();
+      }
+
+      const source = audioContext.createMediaStreamSource(stream);
+      const highpass = audioContext.createBiquadFilter();
+      highpass.type = "highpass";
+      highpass.frequency.value = 80;
+
+      const lowpass = audioContext.createBiquadFilter();
+      lowpass.type = "lowpass";
+      lowpass.frequency.value = 7500;
+
+      const compressor = audioContext.createDynamicsCompressor();
+      compressor.threshold.value = -24;
+      compressor.knee.value = 30;
+      compressor.ratio.value = 8;
+      compressor.attack.value = 0.003;
+      compressor.release.value = 0.25;
+
+      const processor = audioContext.createScriptProcessor(AUDIO_BUFFER_SIZE, 1, 1);
+      const muteGain = audioContext.createGain();
+      muteGain.gain.value = 0;
+
+      const state = {
+        pushStream: null,
+        noiseFloor: MIN_SIGNAL_RMS * 0.65,
+        currentGain: 1,
+        speechActive: false,
+        speechMs: 0,
+        silenceMs: 0,
+        lowVolumeMs: 0,
+        clippingMs: 0,
+        highNoiseMs: 0,
+        currentIssue: null,
+        lastReportedIssue: null,
+        lastQualityReportAt: 0,
+        preRoll: [],
+        streamClosed: false,
+      };
+
+      const createAudioConfig = () => {
+        if (state.pushStream) {
+          try {
+            state.pushStream.close();
+          } catch (error) {
+            console.warn("Microphone push stream close failed", error);
+          }
+        }
+
+        const { pushStream, audioConfig } = this.buildPushAudioConfig();
+        state.pushStream = pushStream;
+        return audioConfig;
+      };
+
+      const stopFeeding = () => {
+        if (state.streamClosed) {
+          return;
+        }
+
+        state.streamClosed = true;
+        processor.onaudioprocess = null;
+
+        try {
+          source.disconnect();
+        } catch (error) {
+          console.warn("Microphone source disconnect failed", error);
+        }
+
+        try {
+          highpass.disconnect();
+        } catch (error) {
+          console.warn("High-pass disconnect failed", error);
+        }
+
+        try {
+          lowpass.disconnect();
+        } catch (error) {
+          console.warn("Low-pass disconnect failed", error);
+        }
+
+        try {
+          compressor.disconnect();
+        } catch (error) {
+          console.warn("Compressor disconnect failed", error);
+        }
+
+        try {
+          processor.disconnect();
+        } catch (error) {
+          console.warn("Processor disconnect failed", error);
+        }
+
+        try {
+          muteGain.disconnect();
+        } catch (error) {
+          console.warn("Mute gain disconnect failed", error);
+        }
+
+        stream.getTracks().forEach((track) => track.stop());
+
+        if (state.pushStream) {
+          try {
+            state.pushStream.close();
+          } catch (error) {
+            console.warn("Microphone push stream close failed", error);
+          }
+        }
+
+        this.reportAudioQuality({ issue: null, sourceType: "microphone" });
+      };
+
+      processor.onaudioprocess = (event) => {
+        if (state.streamClosed) {
+          return;
+        }
+
+        const mono = downmixToMono(event.inputBuffer);
+        const resampled = resampleAudio(mono, audioContext.sampleRate, SPEECH_SAMPLE_RATE);
+        if (!resampled.length) {
+          return;
+        }
+
+        const rawRms = computeRms(resampled);
+        const rawPeak = computePeak(resampled);
+        const frameDurationMs = (resampled.length / SPEECH_SAMPLE_RATE) * 1000;
+
+        state.noiseFloor = rawRms < state.noiseFloor * 1.8
+          ? state.noiseFloor * 0.96 + rawRms * 0.04
+          : state.noiseFloor * 0.995 + rawRms * 0.005;
+
+        const speechThreshold = Math.max(MIN_SIGNAL_RMS, state.noiseFloor * 2.2);
+        const isSpeechCandidate = rawRms >= speechThreshold || (rawPeak >= 0.08 && rawRms >= state.noiseFloor * 1.4);
+        const desiredGain = isSpeechCandidate && rawRms > 0.001
+          ? clamp(TARGET_SPEECH_RMS / rawRms, MIN_GAIN, MAX_GAIN)
+          : 1;
+
+        state.currentGain = state.currentGain * 0.82 + desiredGain * 0.18;
+        const normalized = applyGain(resampled, state.currentGain);
+        const processedMetrics = {
+          rms: computeRms(normalized),
+          peak: computePeak(normalized),
+        };
+        const frame = {
+          buffer: encodePcm16(normalized),
+          durationMs: frameDurationMs,
+        };
+
+        state.currentIssue = this.resolveAudioIssue(processedMetrics, state, frameDurationMs);
+
+        if (!state.speechActive) {
+          state.preRoll.push(frame);
+          this.trimPreRoll(state);
+        }
+
+        if (isSpeechCandidate) {
+          state.speechMs += frameDurationMs;
+          state.silenceMs = 0;
+        } else {
+          state.speechMs = 0;
+          state.silenceMs += frameDurationMs;
+        }
+
+        let frameAlreadyWritten = false;
+
+        if (!state.speechActive && isSpeechCandidate && state.speechMs >= VAD_START_MS) {
+          state.speechActive = true;
+          state.preRoll.forEach((preRollFrame) => this.writeToPushStream(state.pushStream, preRollFrame));
+          state.preRoll = [];
+          frameAlreadyWritten = true;
+        }
+
+        if (state.speechActive) {
+          if (!frameAlreadyWritten) {
+            this.writeToPushStream(state.pushStream, frame);
+          }
+          if (!isSpeechCandidate && state.silenceMs >= VAD_RELEASE_MS) {
+            state.speechActive = false;
+            state.silenceMs = 0;
+            state.preRoll = [];
+          }
+        }
+
+        this.maybeReportAudioQuality(state, processedMetrics);
+      };
+
+      source.connect(highpass);
+      highpass.connect(lowpass);
+      lowpass.connect(compressor);
+      compressor.connect(processor);
+      processor.connect(muteGain);
+      muteGain.connect(audioContext.destination);
+
+      return {
+        stream,
+        audioContext,
+        createAudioConfig,
+        stopFeeding,
+      };
     }
 
     buildRecognizer(config, audioConfigOverride) {
@@ -265,11 +604,18 @@
       this.sourceType = "microphone";
 
       await this.requestMicrophonePermission();
+      await this.cleanupMicrophoneState();
+      this.microphoneState = await this.createMicrophoneState();
       await this.startRecognizer();
     }
 
     async startRecognizer(audioConfigOverride) {
-      const recognizer = this.buildRecognizer(this.currentConfig, audioConfigOverride);
+      let nextAudioConfig = audioConfigOverride;
+      if (!nextAudioConfig && this.sourceType === "microphone" && this.microphoneState) {
+        nextAudioConfig = this.microphoneState.createAudioConfig();
+      }
+
+      const recognizer = this.buildRecognizer(this.currentConfig, nextAudioConfig);
       this.sessionStartedAt = Date.now();
       this.wireRecognizer(recognizer);
       this.recognizer = recognizer;
@@ -321,11 +667,21 @@
         await audioContext.resume();
       }
 
-      const format = window.SpeechSDK.AudioStreamFormat.getWaveFormatPCM(MEDIA_SAMPLE_RATE, 16, 1);
-      const pushStream = window.SpeechSDK.AudioInputStream.createPushStream(format);
-      const audioConfig = window.SpeechSDK.AudioConfig.fromStreamInput(pushStream);
+      const { pushStream, audioConfig } = this.buildPushAudioConfig();
       const mediaSource = audioContext.createMediaElementSource(mediaElement);
-      const processor = audioContext.createScriptProcessor(MEDIA_BUFFER_SIZE, 2, 1);
+      const highpass = audioContext.createBiquadFilter();
+      highpass.type = "highpass";
+      highpass.frequency.value = 80;
+      const lowpass = audioContext.createBiquadFilter();
+      lowpass.type = "lowpass";
+      lowpass.frequency.value = 7500;
+      const compressor = audioContext.createDynamicsCompressor();
+      compressor.threshold.value = -24;
+      compressor.knee.value = 30;
+      compressor.ratio.value = 8;
+      compressor.attack.value = 0.003;
+      compressor.release.value = 0.25;
+      const processor = audioContext.createScriptProcessor(AUDIO_BUFFER_SIZE, 2, 1);
       const muteGain = audioContext.createGain();
       let streamClosed = false;
 
@@ -343,6 +699,24 @@
           mediaSource.disconnect();
         } catch (error) {
           console.warn("Media source disconnect failed", error);
+        }
+
+        try {
+          highpass.disconnect();
+        } catch (error) {
+          console.warn("Media high-pass disconnect failed", error);
+        }
+
+        try {
+          lowpass.disconnect();
+        } catch (error) {
+          console.warn("Media low-pass disconnect failed", error);
+        }
+
+        try {
+          compressor.disconnect();
+        } catch (error) {
+          console.warn("Media compressor disconnect failed", error);
         }
 
         try {
@@ -370,7 +744,7 @@
         }
 
         const mono = downmixToMono(event.inputBuffer);
-        const resampled = resampleAudio(mono, audioContext.sampleRate, MEDIA_SAMPLE_RATE);
+        const resampled = resampleAudio(mono, audioContext.sampleRate, SPEECH_SAMPLE_RATE);
         if (!resampled.length) {
           return;
         }
@@ -378,7 +752,10 @@
         pushStream.write(encodePcm16(resampled));
       };
 
-      mediaSource.connect(processor);
+      mediaSource.connect(highpass);
+      highpass.connect(lowpass);
+      lowpass.connect(compressor);
+      compressor.connect(processor);
       processor.connect(muteGain);
       muteGain.connect(audioContext.destination);
 
@@ -433,6 +810,27 @@
 
       if (mediaState.objectUrl) {
         URL.revokeObjectURL(mediaState.objectUrl);
+      }
+    }
+
+    async cleanupMicrophoneState() {
+      const microphoneState = this.microphoneState;
+      this.microphoneState = null;
+
+      if (!microphoneState) {
+        return;
+      }
+
+      if (typeof microphoneState.stopFeeding === "function") {
+        microphoneState.stopFeeding();
+      }
+
+      if (microphoneState.audioContext) {
+        try {
+          await microphoneState.audioContext.close();
+        } catch (error) {
+          console.warn("Microphone audio context close failed", error);
+        }
       }
     }
 
@@ -571,6 +969,7 @@
         );
       });
 
+      await this.cleanupMicrophoneState();
       this.sourceType = null;
     }
   }

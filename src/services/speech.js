@@ -32,6 +32,12 @@
     }
   }
 
+  function getPreferredProcessingLanguage(config) {
+    return typeof (config && config.preferredProcessingLanguage) === "string"
+      ? config.preferredProcessingLanguage.trim()
+      : "";
+  }
+
   function downmixToMono(inputBuffer) {
     if (!inputBuffer || inputBuffer.numberOfChannels === 0) {
       return new Float32Array();
@@ -148,14 +154,21 @@
     buildRecognizer(config, audioConfigOverride) {
       ensureSpeechSdk();
       const speechConfig = window.SpeechSDK.SpeechConfig.fromSubscription(config.azureKey, config.azureRegion);
+      const preferredProcessingLanguage = getPreferredProcessingLanguage(config);
+      const audioConfig = audioConfigOverride || window.SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+
       speechConfig.outputFormat = window.SpeechSDK.OutputFormat.Detailed;
       speechConfig.enableDictation();
       speechConfig.setProperty(window.SpeechSDK.PropertyId.SpeechServiceResponse_RequestWordLevelTimestamps, "true");
-      speechConfig.setProperty(window.SpeechSDK.PropertyId.SpeechServiceConnection_LanguageIdMode, "Continuous");
       speechConfig.setProperty(window.SpeechSDK.PropertyId.SpeechServiceResponse_PostProcessingOption, "TrueText");
 
+      if (preferredProcessingLanguage) {
+        speechConfig.speechRecognitionLanguage = preferredProcessingLanguage;
+        return new window.SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
+      }
+
+      speechConfig.setProperty(window.SpeechSDK.PropertyId.SpeechServiceConnection_LanguageIdMode, "Continuous");
       const autoDetectConfig = window.SpeechSDK.AutoDetectSourceLanguageConfig.fromLanguages(config.recognitionLanguages);
-  const audioConfig = audioConfigOverride || window.SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
 
       if (typeof window.SpeechSDK.SpeechRecognizer.FromConfig === "function") {
         return window.SpeechSDK.SpeechRecognizer.FromConfig(speechConfig, autoDetectConfig, audioConfig);
@@ -181,8 +194,14 @@
           console.warn("Unable to parse Azure detailed result", error);
         }
 
-        const autoDetectResult = window.SpeechSDK.AutoDetectSourceLanguageResult.fromResult(event.result);
-        const language = autoDetectResult ? autoDetectResult.language : null;
+        const preferredProcessingLanguage = getPreferredProcessingLanguage(this.currentConfig);
+        let language = preferredProcessingLanguage;
+
+        if (!language) {
+          const autoDetectResult = window.SpeechSDK.AutoDetectSourceLanguageResult.fromResult(event.result);
+          language = autoDetectResult ? autoDetectResult.language : null;
+        }
+
         const offsetMs = Number(event.result.offset || 0) / 10000;
         const durationMs = Number(event.result.duration || 0) / 10000;
         const resultAt = (this.sessionStartedAt || Date.now()) + offsetMs;

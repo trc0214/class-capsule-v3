@@ -3,6 +3,7 @@ window.LECTURE_ASSISTANT_LOCAL_CONFIG = {
   azureRegion: "eastus",
   geminiKey: "",
   interfaceLanguage: "en",
+  preferredProcessingLanguage: "",
   recognitionLanguages: ["en-US", "zh-TW"],
   segmentIntervalMinutes: 3,
 };

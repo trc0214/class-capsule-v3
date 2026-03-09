@@ -40,6 +40,39 @@
     return methods.includes("generateContent");
   }
 
+  function describePreferredLanguage(languageCode) {
+    const normalized = String(languageCode || "").trim();
+
+    if (!normalized) {
+      return "";
+    }
+
+    const labels = {
+      en: "English",
+      "en-US": "English (United States)",
+      "en-GB": "English (United Kingdom)",
+      zh: "Chinese",
+      "zh-TW": "Traditional Chinese",
+      "zh-CN": "Simplified Chinese",
+      ja: "Japanese",
+      "ja-JP": "Japanese",
+      ko: "Korean",
+      "ko-KR": "Korean",
+    };
+
+    return labels[normalized] || `language code ${normalized}`;
+  }
+
+  function buildLanguageInstruction(languageCode) {
+    const normalized = String(languageCode || "").trim();
+
+    if (!normalized) {
+      return "Detect the dominant lecture language from the transcript and write the notes in that language.";
+    }
+
+    return `The preferred lecture language is ${describePreferredLanguage(normalized)} (${normalized}). Write headings and explanations primarily in this language.`;
+  }
+
   function chooseBestModel(models) {
     const normalized = models
       .filter(canGenerateContent)
@@ -133,6 +166,7 @@
         throw new Error("Transcript is empty.");
       }
 
+      const languageInstruction = buildLanguageInstruction(input.preferredProcessingLanguage);
       const transcriptSegments = splitTranscript(transcript, 12000);
       const contextBlock = input.referenceContext
         ? `Reference material excerpts:\n${input.referenceContext}\n\n`
@@ -142,6 +176,7 @@
         `Course name: ${input.courseName || "Unknown course"}`,
         `Lecture topic: ${input.topic || "Not provided"}`,
         `Lecture date: ${new Date(input.date || Date.now()).toLocaleString()}`,
+        `Preferred lecture language: ${input.preferredProcessingLanguage || "Auto detect from transcript"}`,
         `Technical terms: ${(input.technicalTerms || []).join(", ") || "None detected"}`,
         `Additional context: ${input.additionalContext || "None provided"}`,
       ].join("\n");
@@ -153,6 +188,7 @@
           input.onProgress && input.onProgress(`Summarizing segment ${index + 1} of ${transcriptSegments.length}`);
           const segmentPrompt = [
             "You are producing faithful lecture notes for university students.",
+            languageInstruction,
             "Summarize the segment below. Preserve technical terminology exactly, including mixed Chinese and English terms.",
             "Return Markdown with these sections only:",
             "## Segment Summary",
@@ -174,6 +210,7 @@
       input.onProgress && input.onProgress(transcriptSegments.length > 1 ? "Combining segment summaries" : "Generating lecture notes");
       const finalPrompt = [
         "You are generating polished Markdown lecture notes for a student after a live university lecture.",
+        languageInstruction,
         "Be precise, structured, and faithful to the transcript. Preserve technical terms exactly and include computer science vocabulary.",
         "If the transcript is noisy, infer structure conservatively and avoid inventing details.",
         "Return Markdown in exactly this structure:",

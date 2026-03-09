@@ -4,6 +4,7 @@
     azureRegion: "",
     geminiKey: "",
     interfaceLanguage: "en",
+    preferredProcessingLanguage: "",
     recognitionLanguages: ["en-US", "zh-TW"],
     segmentIntervalMinutes: 3,
   };
@@ -13,6 +14,7 @@
     "azureRegion",
     "geminiKey",
     "interfaceLanguage",
+    "preferredProcessingLanguage",
     "recognitionLanguages",
     "segmentIntervalMinutes",
   ];
@@ -75,6 +77,10 @@
       if (!Array.isArray(normalized.recognitionLanguages) || !normalized.recognitionLanguages.length) {
         normalized.recognitionLanguages = [...DEFAULT_SETTINGS.recognitionLanguages];
       }
+
+      normalized.preferredProcessingLanguage = typeof normalized.preferredProcessingLanguage === "string"
+        ? normalized.preferredProcessingLanguage.trim()
+        : "";
 
       normalized.segmentIntervalMinutes = Math.min(15, Math.max(1, Number(normalized.segmentIntervalMinutes) || DEFAULT_SETTINGS.segmentIntervalMinutes));
       return normalized;

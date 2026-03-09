@@ -52,7 +52,9 @@
       azureRegion: "Azure Region",
       geminiApiKey: "Gemini API Key",
       pasteGeminiKey: "Paste Gemini key",
-      recognitionLanguages: "Recognition Languages",
+      preferredProcessingLanguage: "Primary Lecture Language",
+      preferredProcessingLanguagePlaceholder: "Leave blank to auto detect, e.g. en-US or zh-TW",
+      recognitionLanguages: "Recognition Languages (Auto Detect)",
       segmentIntervalFallback: "Segment Interval Fallback (minutes)",
       keysSource: "Keys can come from browser storage or config/local-config.js.",
       reset: "Reset",
@@ -132,7 +134,9 @@
       azureRegion: "Azure 區域",
       geminiApiKey: "Gemini API 金鑰",
       pasteGeminiKey: "貼上 Gemini 金鑰",
-      recognitionLanguages: "辨識語言",
+      preferredProcessingLanguage: "課堂主要語言",
+      preferredProcessingLanguagePlaceholder: "留空則自動偵測，例如 en-US 或 zh-TW",
+      recognitionLanguages: "辨識語言（自動偵測）",
       segmentIntervalFallback: "分段後備間隔（分鐘）",
       keysSource: "金鑰可來自瀏覽器儲存或 config/local-config.js。",
       reset: "重設",
@@ -253,6 +257,7 @@
         azureKeyInput: document.getElementById("azureKeyInput"),
         azureRegionInput: document.getElementById("azureRegionInput"),
         geminiKeyInput: document.getElementById("geminiKeyInput"),
+        preferredProcessingLanguageInput: document.getElementById("preferredProcessingLanguageInput"),
         recognitionLanguagesInput: document.getElementById("recognitionLanguagesInput"),
         segmentIntervalInput: document.getElementById("segmentIntervalInput"),
         settingsLanguageInput: document.getElementById("settingsLanguageInput"),
@@ -265,6 +270,7 @@
         azureKeyLabel: document.querySelector("#azureKeyInput").previousElementSibling,
         azureRegionLabel: document.querySelector("#azureRegionInput").previousElementSibling,
         geminiKeyLabel: document.querySelector("#geminiKeyInput").previousElementSibling,
+        preferredProcessingLanguageLabel: document.querySelector("#preferredProcessingLanguageInput").previousElementSibling,
         recognitionLanguagesLabel: document.querySelector("#recognitionLanguagesInput").previousElementSibling,
         segmentIntervalLabel: document.querySelector("#segmentIntervalInput").previousElementSibling,
         settingsLanguageLabel: document.querySelector("#settingsLanguageInput").previousElementSibling,
@@ -327,6 +333,8 @@
       this.refs.azureRegionLabel.textContent = this.t("azureRegion");
       this.refs.geminiKeyLabel.textContent = this.t("geminiApiKey");
       this.refs.geminiKeyInput.placeholder = this.t("pasteGeminiKey");
+      this.refs.preferredProcessingLanguageLabel.textContent = this.t("preferredProcessingLanguage");
+      this.refs.preferredProcessingLanguageInput.placeholder = this.t("preferredProcessingLanguagePlaceholder");
       this.refs.recognitionLanguagesLabel.textContent = this.t("recognitionLanguages");
       this.refs.segmentIntervalLabel.textContent = this.t("segmentIntervalFallback");
       this.refs.settingsLanguageLabel.textContent = this.t("interfaceLanguage");
@@ -542,6 +550,7 @@
       this.refs.azureKeyInput.value = settings.azureKey || "";
       this.refs.azureRegionInput.value = settings.azureRegion || "";
       this.refs.geminiKeyInput.value = settings.geminiKey || "";
+      this.refs.preferredProcessingLanguageInput.value = settings.preferredProcessingLanguage || "";
       this.refs.recognitionLanguagesInput.value = (settings.recognitionLanguages || []).join(", ");
       this.refs.segmentIntervalInput.value = settings.segmentIntervalMinutes || 3;
       this.refs.settingsLanguageInput.value = settings.interfaceLanguage || "en";
@@ -554,6 +563,7 @@
         azureKey: this.refs.azureKeyInput.value.trim(),
         azureRegion: this.refs.azureRegionInput.value.trim(),
         geminiKey: this.refs.geminiKeyInput.value.trim(),
+        preferredProcessingLanguage: this.refs.preferredProcessingLanguageInput.value.trim(),
         recognitionLanguages: this.refs.recognitionLanguagesInput.value,
         segmentIntervalMinutes: Number(this.refs.segmentIntervalInput.value),
         interfaceLanguage: this.refs.settingsLanguageInput.value,

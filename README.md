@@ -65,6 +65,7 @@ Microphone input
 
 - Real-time continuous lecture transcription in the browser
 - Upload audio or video files and transcribe them in-browser without using the microphone
+- Optional primary lecture language setting that forces speech and note generation to use one language, with auto-detect as the fallback
 - Mixed-language speech recognition configuration for English and Traditional Chinese
 - Partial and final transcript display
 - Technical term detection and transcript highlighting
@@ -131,6 +132,7 @@ The supported local workflow is:
    - Azure Speech API key
    - Azure Speech region
    - Gemini API key
+   - optional primary lecture language such as `en-US` or `zh-TW` (leave blank for auto-detect)
    - recognition languages such as `en-US, zh-TW`
 4. Save settings.
 5. Click `Start Recording`.
@@ -161,6 +163,7 @@ Fields:
 - `Azure Speech API Key`
 - `Azure Region`
 - `Gemini API Key`
+- `Primary Lecture Language`
 - `Recognition Languages`
 - `Segment Interval Fallback`
 - `Interface Language`

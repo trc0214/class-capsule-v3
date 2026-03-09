@@ -250,8 +250,13 @@ Generated notes will appear here.</div>
             <input id="geminiKeyInput" type="password" autocomplete="off" class="mt-2 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500" placeholder="Paste Gemini key" />
           </label>
 
+          <label class="block rounded-2xl border border-zinc-200 bg-zinc-50 p-4 md:col-span-2">
+            <span class="block text-xs font-semibold uppercase tracking-[0.18em] text-steel">Primary Lecture Language</span>
+            <input id="preferredProcessingLanguageInput" type="text" autocomplete="off" class="mt-2 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500" placeholder="Leave blank to auto detect, e.g. en-US or zh-TW" />
+          </label>
+
           <label class="block rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-            <span class="block text-xs font-semibold uppercase tracking-[0.18em] text-steel">Recognition Languages</span>
+            <span class="block text-xs font-semibold uppercase tracking-[0.18em] text-steel">Recognition Languages (Auto Detect)</span>
             <input id="recognitionLanguagesInput" type="text" autocomplete="off" class="mt-2 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500" placeholder="en-US, zh-TW" />
           </label>
 

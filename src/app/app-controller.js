@@ -321,6 +321,7 @@
           await this.speechService.start({
             azureKey: settings.azureKey,
             azureRegion: settings.azureRegion,
+            preferredProcessingLanguage: settings.preferredProcessingLanguage,
             recognitionLanguages: settings.recognitionLanguages,
           });
 
@@ -445,6 +446,7 @@
             {
               azureKey: settings.azureKey,
               azureRegion: settings.azureRegion,
+              preferredProcessingLanguage: settings.preferredProcessingLanguage,
               recognitionLanguages: settings.recognitionLanguages,
             },
             file
@@ -520,6 +522,7 @@
 
           const notes = await window.GeminiService.generateNotes({
             geminiKey: settings.geminiKey,
+            preferredProcessingLanguage: settings.preferredProcessingLanguage,
             transcript: this.transcriptProcessor.getTranscriptText(),
             lectureTitle: this.currentLecture.title,
             courseName: this.currentLecture.courseName,

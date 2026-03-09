@@ -26,6 +26,16 @@
       referenceDocuments: "Reference Documents",
       referenceDocumentsHelp: "Upload .txt, .md, or .pdf lecture materials before generating notes.",
       upload: "Upload",
+      uploadedMedia: "Uploaded Media",
+      uploadedMediaHelp: "Upload an audio or video file to transcribe without using the microphone.",
+      noMediaSelected: "No media file selected.",
+      selectedMedia: "Selected media: {name}",
+      preparingMedia: "Preparing uploaded media",
+      transcribingMedia: "Transcribing uploaded media",
+      transcribingMediaFile: "Transcribing {name}...",
+      mediaLectureSavedLocally: "Uploaded media transcript saved locally.",
+      uploadAudioOrVideoFirst: "Please upload an audio or video file.",
+      unsupportedMediaFile: "Please upload an audio or video file.",
       detectedTechnicalTerms: "Detected Technical Terms",
       partialRecognition: "Partial Recognition",
       waitingForSpeech: "Waiting for speech input.",
@@ -96,6 +106,16 @@
       referenceDocuments: "參考文件",
       referenceDocumentsHelp: "在產生筆記前上傳 .txt、.md 或 .pdf 講義資料。",
       upload: "上傳",
+      uploadedMedia: "上傳影音",
+      uploadedMediaHelp: "上傳音訊或影片檔即可轉錄，不必使用麥克風。",
+      noMediaSelected: "尚未選擇任何影音檔。",
+      selectedMedia: "已選擇影音：{name}",
+      preparingMedia: "正在準備影音轉錄",
+      transcribingMedia: "正在轉錄上傳影音",
+      transcribingMediaFile: "正在轉錄 {name}...",
+      mediaLectureSavedLocally: "上傳影音的逐字稿已儲存在本機。",
+      uploadAudioOrVideoFirst: "請先上傳音訊或影片檔。",
+      unsupportedMediaFile: "請上傳音訊或影片檔。",
       detectedTechnicalTerms: "偵測到的技術名詞",
       partialRecognition: "即時辨識片段",
       waitingForSpeech: "等待語音輸入。",
@@ -203,11 +223,17 @@
         additionalContextInput: document.getElementById("additionalContextInput"),
         interfaceLanguageLabel: document.querySelector("#interfaceLanguageSelect").previousElementSibling,
         interfaceLanguageSelect: document.getElementById("interfaceLanguageSelect"),
+        mediaInput: document.getElementById("mediaInput"),
+        mediaUploadTitle: document.getElementById("mediaUploadTitle"),
+        mediaUploadHelp: document.getElementById("mediaUploadHelp"),
+        mediaUploadLabel: document.getElementById("mediaUploadLabel"),
+        mediaUploadButtonText: document.getElementById("mediaUploadButtonText"),
+        mediaUploadStatus: document.getElementById("mediaUploadStatus"),
         documentInput: document.getElementById("documentInput"),
+        documentUploadButtonText: document.getElementById("documentUploadButtonText"),
         documentList: document.getElementById("documentList"),
         referenceDocumentsTitle: document.querySelector("#documentList").previousElementSibling.querySelector("p.text-xs.font-semibold.uppercase"),
         referenceDocumentsHelp: document.querySelector("#documentList").previousElementSibling.querySelector("p.mt-2.text-sm.leading-6"),
-        uploadLabel: document.querySelector("label.cursor-pointer.rounded-full"),
         technicalTermsTitle: document.querySelector("#termList").previousElementSibling,
         partialRecognitionTitle: document.querySelector("#partialTranscript").previousElementSibling,
         startButton: document.getElementById("startButton"),
@@ -284,7 +310,10 @@
       this.refs.additionalContextInput.placeholder = this.t("additionalContextPlaceholder");
       this.refs.referenceDocumentsTitle.textContent = this.t("referenceDocuments");
       this.refs.referenceDocumentsHelp.textContent = this.t("referenceDocumentsHelp");
-      this.refs.uploadLabel.childNodes[0].textContent = this.t("upload");
+      this.refs.documentUploadButtonText.textContent = this.t("upload");
+      this.refs.mediaUploadTitle.textContent = this.t("uploadedMedia");
+      this.refs.mediaUploadHelp.textContent = this.t("uploadedMediaHelp");
+      this.refs.mediaUploadButtonText.textContent = this.t("upload");
       this.refs.technicalTermsTitle.textContent = this.t("detectedTechnicalTerms");
       this.refs.partialRecognitionTitle.textContent = this.t("partialRecognition");
       this.refs.aiNotesLabel.textContent = this.t("aiNotes");
@@ -324,6 +353,10 @@
         collapsedSettings.setAttribute("aria-label", this.t("settings"));
       }
 
+      if (!this.refs.mediaUploadStatus.dataset.hasMedia || this.refs.mediaUploadStatus.dataset.hasMedia === "false") {
+        this.refs.mediaUploadStatus.textContent = this.t("noMediaSelected");
+      }
+
       if (!this.refs.partialTranscript.textContent || this.refs.partialTranscript.textContent === MESSAGES.en.waitingForSpeech || this.refs.partialTranscript.textContent === MESSAGES["zh-TW"].waitingForSpeech) {
         this.refs.partialTranscript.textContent = this.t("waitingForSpeech");
       }
@@ -345,6 +378,7 @@
       this.refs.sidebarSettingsButton.addEventListener("click", () => this.openSettings());
       this.refs.closeSettingsButton.addEventListener("click", () => this.closeSettings());
       this.refs.newLectureButton.addEventListener("click", handlers.onNewLecture);
+      this.refs.mediaInput.addEventListener("change", handlers.onMediaUpload);
       this.refs.documentInput.addEventListener("change", handlers.onDocumentUpload);
       this.refs.settingsForm.addEventListener("submit", handlers.onSaveSettings);
       this.refs.resetSettingsButton.addEventListener("click", handlers.onResetSettings);
@@ -612,6 +646,39 @@
           `
         )
         .join("");
+    },
+
+    renderUploadedMedia(media, statusOverride) {
+      if (statusOverride) {
+        this.refs.mediaUploadStatus.textContent = statusOverride;
+        this.refs.mediaUploadStatus.dataset.hasMedia = media ? "true" : "false";
+        return;
+      }
+
+      if (!media) {
+        this.refs.mediaUploadStatus.textContent = this.t("noMediaSelected");
+        this.refs.mediaUploadStatus.dataset.hasMedia = "false";
+        return;
+      }
+
+      const baseLabel = this.t("selectedMedia", { name: media.name || "" });
+      const details = [];
+      if (media.size) {
+        details.push(formatBytes(media.size));
+      }
+      if (media.durationMs) {
+        details.push(formatDuration(media.durationMs));
+      }
+
+      this.refs.mediaUploadStatus.textContent = details.length ? `${baseLabel} (${details.join(", ")})` : baseLabel;
+      this.refs.mediaUploadStatus.dataset.hasMedia = "true";
+    },
+
+    setMediaUploadBusy(isBusy) {
+      this.refs.mediaInput.disabled = Boolean(isBusy);
+      this.refs.mediaUploadLabel.classList.toggle("opacity-60", Boolean(isBusy));
+      this.refs.mediaUploadLabel.classList.toggle("cursor-not-allowed", Boolean(isBusy));
+      this.refs.mediaUploadLabel.classList.toggle("cursor-pointer", !isBusy);
     },
 
     renderLectureSummary(lecture, isRecording) {

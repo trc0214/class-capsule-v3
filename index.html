@@ -152,13 +152,27 @@
 
               <div class="space-y-4">
                 <div class="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+                  <div class="flex items-center justify-between gap-4">
+                    <div>
+                      <p id="mediaUploadTitle" class="text-xs font-semibold uppercase tracking-[0.18em] text-steel">Uploaded Media</p>
+                      <p id="mediaUploadHelp" class="mt-2 text-sm leading-6 text-zinc-600">Upload an audio or video file to transcribe without using the microphone.</p>
+                    </div>
+                    <label id="mediaUploadLabel" class="cursor-pointer rounded-full border border-zinc-300 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-800 transition hover:border-zinc-800">
+                      <span id="mediaUploadButtonText">Upload</span>
+                      <input id="mediaInput" type="file" accept="audio/*,video/*" class="hidden" />
+                    </label>
+                  </div>
+                  <p id="mediaUploadStatus" class="mt-4 text-sm leading-6 text-zinc-600">No media file selected.</p>
+                </div>
+
+                <div class="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
                   <div class="flex items-center justify-between">
                     <div>
                       <p class="text-xs font-semibold uppercase tracking-[0.18em] text-steel">Reference Documents</p>
                       <p class="mt-2 text-sm leading-6 text-zinc-600">Upload .txt, .md, or .pdf lecture materials before generating notes.</p>
                     </div>
-                    <label class="cursor-pointer rounded-full border border-zinc-300 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-800 transition hover:border-zinc-800">
-                      Upload
+                    <label id="documentUploadLabel" class="cursor-pointer rounded-full border border-zinc-300 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-800 transition hover:border-zinc-800">
+                      <span id="documentUploadButtonText">Upload</span>
                       <input id="documentInput" type="file" accept=".txt,.md,.markdown,.pdf,text/plain,text/markdown,application/pdf" class="hidden" multiple />
                     </label>
                   </div>
@@ -282,6 +296,8 @@ Generated notes will appear here.</div>
     <script src="src/services/speech.js"></script>
     <script src="src/services/rag.js"></script>
     <script src="src/services/gemini.js"></script>
+    <script src="src/app/lecture-manager.js"></script>
+    <script src="src/app/app-controller.js"></script>
     <script src="src/ui/ui.js"></script>
     <script src="src/app.js"></script>
   </body>

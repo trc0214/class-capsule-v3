@@ -1,5 +1,7 @@
 (function () {
-  const MODEL_NAME = "gemini-1.5-pro";
+  const GEMINI_API_VERSION = "v1beta";
+  const MODEL_PREFERENCES = ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash", "gemini-1.5-pro"];
+  let cachedModelName = null;
 
   function extractResponseText(payload) {
     const parts = payload && payload.candidates && payload.candidates[0] && payload.candidates[0].content && payload.candidates[0].content.parts;
@@ -29,8 +31,57 @@
     return segments.filter(Boolean);
   }
 
-  async function callGemini(apiKey, prompt, options) {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${encodeURIComponent(apiKey)}`, {
+  function normalizeModelName(name) {
+    return String(name || "").replace(/^models\//, "");
+  }
+
+  function canGenerateContent(model) {
+    const methods = Array.isArray(model && model.supportedGenerationMethods) ? model.supportedGenerationMethods : [];
+    return methods.includes("generateContent");
+  }
+
+  function chooseBestModel(models) {
+    const normalized = models
+      .filter(canGenerateContent)
+      .map((model) => ({
+        original: model,
+        normalizedName: normalizeModelName(model.name),
+      }));
+
+    for (const preferred of MODEL_PREFERENCES) {
+      const match = normalized.find((model) => model.normalizedName === preferred);
+      if (match) {
+        return match.normalizedName;
+      }
+    }
+
+    return normalized.length ? normalized[0].normalizedName : null;
+  }
+
+  async function resolveModelName(apiKey, forceRefresh) {
+    if (cachedModelName && !forceRefresh) {
+      return cachedModelName;
+    }
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/${GEMINI_API_VERSION}/models?key=${encodeURIComponent(apiKey)}`);
+    const payload = await response.json();
+
+    if (!response.ok) {
+      const message = payload && payload.error && payload.error.message ? payload.error.message : "Unable to list Gemini models.";
+      throw new Error(message);
+    }
+
+    const modelName = chooseBestModel(Array.isArray(payload.models) ? payload.models : []);
+    if (!modelName) {
+      throw new Error("No Gemini model with generateContent support is available for this API key.");
+    }
+
+    cachedModelName = modelName;
+    return modelName;
+  }
+
+  async function sendGenerateContentRequest(apiKey, modelName, prompt, options) {
+    return fetch(`https://generativelanguage.googleapis.com/${GEMINI_API_VERSION}/models/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -44,8 +95,23 @@
         },
       }),
     });
+  }
 
-    const payload = await response.json();
+  function isModelNotFoundError(payload) {
+    const message = payload && payload.error && payload.error.message ? payload.error.message : "";
+    return /not found|not supported/i.test(message);
+  }
+
+  async function callGemini(apiKey, prompt, options) {
+    let modelName = await resolveModelName(apiKey, false);
+    let response = await sendGenerateContentRequest(apiKey, modelName, prompt, options);
+    let payload = await response.json();
+
+    if (!response.ok && isModelNotFoundError(payload)) {
+      modelName = await resolveModelName(apiKey, true);
+      response = await sendGenerateContentRequest(apiKey, modelName, prompt, options);
+      payload = await response.json();
+    }
 
     if (!response.ok) {
       const message = payload && payload.error && payload.error.message ? payload.error.message : "Gemini request failed.";

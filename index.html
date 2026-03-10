@@ -298,6 +298,12 @@ Generated notes will appear here.</div>
           </label>
 
           <label class="block rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+            <span id="interventionSensitivityLabel" class="block text-xs font-semibold uppercase tracking-[0.18em] text-steel">Local Tone Trigger Sensitivity</span>
+            <input id="interventionSensitivityInput" type="number" min="1" max="10" step="1" class="mt-2 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500" />
+            <span id="interventionSensitivityHelp" class="mt-2 block text-sm leading-6 text-zinc-600">Higher values make the local tone model trigger more aggressively.</span>
+          </label>
+
+          <label class="block rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
             <span class="block text-xs font-semibold uppercase tracking-[0.18em] text-steel">Recognition Languages (Auto Detect)</span>
             <input id="recognitionLanguagesInput" type="text" autocomplete="off" class="mt-2 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500" placeholder="en-US, zh-TW" />
           </label>
@@ -341,6 +347,7 @@ Generated notes will appear here.</div>
     <script src="src/core/settings.js"></script>
     <script src="src/core/transcript.js"></script>
     <script src="src/services/speech.js"></script>
+    <script src="src/services/prosody.js"></script>
     <script src="src/services/rag.js"></script>
     <script src="src/services/gemini.js"></script>
     <script src="src/services/intervention.js"></script>

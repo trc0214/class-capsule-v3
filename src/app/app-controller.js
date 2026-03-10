@@ -206,12 +206,10 @@
           return window.UI.t("interventionDisabled");
         }
 
-        if (!settings.geminiKey) {
-          return window.UI.t("interventionUnavailable");
-        }
-
         if (this.isRecording && this.activeCaptureMode === "microphone") {
-          return window.UI.t("interventionMonitoring");
+          return settings.geminiKey
+            ? window.UI.t("interventionMonitoring")
+            : window.UI.t("interventionMonitoringLocal");
         }
 
         return window.UI.t("interventionIdle");
@@ -226,7 +224,7 @@
 
       scheduleInterventionEvaluation(payload, update) {
         const settings = window.SettingsManager.get();
-        if (!settings.interventionEnabled || !settings.geminiKey || this.activeCaptureMode !== "microphone") {
+        if (!settings.interventionEnabled || this.activeCaptureMode !== "microphone") {
           this.renderInterventionPanel();
           return;
         }
@@ -376,7 +374,7 @@
           return;
         }
 
-        if (!settings.interventionEnabled || !settings.geminiKey) {
+        if (!settings.interventionEnabled) {
           this.renderInterventionPanel();
           return;
         }
@@ -407,7 +405,7 @@
         }
 
         this.interventionInFlight = true;
-        this.renderInterventionPanel(window.UI.t("interventionEvaluating"));
+        this.renderInterventionPanel(window.UI.t(settings.geminiKey ? "interventionEvaluating" : "interventionEvaluatingLocal"));
 
         try {
           const intervention = await window.InterventionService.evaluate({
@@ -427,6 +425,9 @@
             additionalContext: this.currentLecture && this.currentLecture.additionalContext,
             pauseMs: settings.interventionPauseMs,
             silenceMs,
+            prosody: this.lastRecognizedPayload.prosody,
+            utteranceDurationMs: this.lastRecognizedPayload.durationMs,
+            interventionSensitivity: settings.interventionSensitivity,
           });
 
           if (intervention && !this.shouldSkipIntervention(intervention)) {

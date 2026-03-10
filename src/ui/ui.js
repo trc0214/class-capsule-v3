@@ -41,14 +41,18 @@
       liveInterventionAssistant: "Live Intervention Assistant",
       interventionIdle: "Monitoring is idle.",
       interventionMonitoring: "Monitoring for intervention opportunities.",
+      interventionMonitoringLocal: "Local tone model is monitoring. Add Gemini for richer intervention wording.",
       interventionUnavailable: "Add a Gemini API key to enable live intervention.",
       interventionDisabled: "Live intervention assistant is disabled.",
       interventionEvaluating: "Analyzing whether AI should intervene...",
+      interventionEvaluatingLocal: "Local tone model is evaluating the latest utterance...",
       interventionWaitingForPause: "Waiting for a VAD-confirmed pause before evaluating.",
       interventionEnabled: "Live Intervention Assistant",
-      interventionEnabledHelp: "Use VAD, audio quality, and scenario rules to decide whether AI should interject during recording.",
+      interventionEnabledHelp: "Use VAD, audio quality, and a local tone model to decide whether AI should interject during recording.",
       interventionScenario: "Intervention Scenario",
       interventionPauseThreshold: "Intervention Pause Threshold (ms)",
+      interventionSensitivity: "Local Tone Trigger Sensitivity",
+      interventionSensitivityHelp: "Higher values make the browser-local tone model trigger more aggressively.",
       scenarioClassroom: "Classroom",
       scenarioInterview: "Interview",
       noInterventionsYet: "No intervention suggestions yet.",
@@ -153,14 +157,18 @@
       liveInterventionAssistant: "即時介入助理",
       interventionIdle: "介入監聽目前閒置中。",
       interventionMonitoring: "正在監聽是否需要 AI 介入。",
+      interventionMonitoringLocal: "本地語氣模型正在監聽中，可加入 Gemini 取得更完整的介入措辭。",
       interventionUnavailable: "請先填入 Gemini API 金鑰以啟用即時介入。",
       interventionDisabled: "即時介入助理目前已停用。",
       interventionEvaluating: "正在分析是否需要 AI 介入...",
+      interventionEvaluatingLocal: "本地語氣模型正在分析最新語句是否需要介入...",
       interventionWaitingForPause: "正在等待 VAD 確認停頓後再判斷是否介入。",
       interventionEnabled: "即時介入助理",
-      interventionEnabledHelp: "結合 VAD、音訊品質與場景規則，判斷錄音中是否需要 AI 主動切入。",
+      interventionEnabledHelp: "結合 VAD、音訊品質與本地語氣模型，判斷錄音中是否需要 AI 主動切入。",
       interventionScenario: "介入情境",
       interventionPauseThreshold: "介入停頓門檻（毫秒）",
+      interventionSensitivity: "本地語氣觸發敏感度",
+      interventionSensitivityHelp: "數值越高，本地端語氣模型越容易觸發介入。",
       scenarioClassroom: "課堂",
       scenarioInterview: "面試",
       noInterventionsYet: "目前尚無介入建議。",
@@ -330,6 +338,7 @@
         interventionEnabledInput: document.getElementById("interventionEnabledInput"),
         assistantScenarioInput: document.getElementById("assistantScenarioInput"),
         interventionPauseInput: document.getElementById("interventionPauseInput"),
+        interventionSensitivityInput: document.getElementById("interventionSensitivityInput"),
         recognitionLanguagesInput: document.getElementById("recognitionLanguagesInput"),
         segmentIntervalInput: document.getElementById("segmentIntervalInput"),
         settingsLanguageInput: document.getElementById("settingsLanguageInput"),
@@ -347,6 +356,8 @@
         interventionEnabledHelp: document.getElementById("interventionEnabledHelp"),
         assistantScenarioLabel: document.getElementById("assistantScenarioLabel"),
         interventionPauseLabel: document.getElementById("interventionPauseLabel"),
+        interventionSensitivityLabel: document.getElementById("interventionSensitivityLabel"),
+        interventionSensitivityHelp: document.getElementById("interventionSensitivityHelp"),
         recognitionLanguagesLabel: document.querySelector("#recognitionLanguagesInput").previousElementSibling,
         segmentIntervalLabel: document.querySelector("#segmentIntervalInput").previousElementSibling,
         settingsLanguageLabel: document.querySelector("#settingsLanguageInput").previousElementSibling,
@@ -422,6 +433,8 @@
       this.refs.assistantScenarioInput.options[0].textContent = this.t("scenarioClassroom");
       this.refs.assistantScenarioInput.options[1].textContent = this.t("scenarioInterview");
       this.refs.interventionPauseLabel.textContent = this.t("interventionPauseThreshold");
+      this.refs.interventionSensitivityLabel.textContent = this.t("interventionSensitivity");
+      this.refs.interventionSensitivityHelp.textContent = this.t("interventionSensitivityHelp");
       this.refs.recognitionLanguagesLabel.textContent = this.t("recognitionLanguages");
       this.refs.segmentIntervalLabel.textContent = this.t("segmentIntervalFallback");
       this.refs.settingsLanguageLabel.textContent = this.t("interfaceLanguage");
@@ -648,6 +661,7 @@
       this.refs.interventionEnabledInput.checked = settings.interventionEnabled !== false;
       this.refs.assistantScenarioInput.value = settings.assistantScenario || "classroom";
       this.refs.interventionPauseInput.value = settings.interventionPauseMs || 1500;
+      this.refs.interventionSensitivityInput.value = settings.interventionSensitivity || 7;
       this.refs.recognitionLanguagesInput.value = (settings.recognitionLanguages || []).join(", ");
       this.refs.segmentIntervalInput.value = settings.segmentIntervalMinutes || 3;
       this.refs.settingsLanguageInput.value = settings.interfaceLanguage || "en";
@@ -664,6 +678,7 @@
         interventionEnabled: this.refs.interventionEnabledInput.checked,
         assistantScenario: this.refs.assistantScenarioInput.value,
         interventionPauseMs: Number(this.refs.interventionPauseInput.value),
+        interventionSensitivity: Number(this.refs.interventionSensitivityInput.value),
         recognitionLanguages: this.refs.recognitionLanguagesInput.value,
         segmentIntervalMinutes: Number(this.refs.segmentIntervalInput.value),
         interfaceLanguage: this.refs.settingsLanguageInput.value,

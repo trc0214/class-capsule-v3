@@ -18,6 +18,8 @@
   const PRE_ROLL_MS = 220;
   const VAD_START_MS = 180;
   const VAD_RELEASE_MS = 650;
+  const MIN_PITCH_HZ = 75;
+  const MAX_PITCH_HZ = 360;
 
   function ensureSpeechSdk() {
     if (!window.SpeechSDK) {
@@ -83,6 +85,147 @@
     }
 
     return peak;
+  }
+
+  function computeZeroCrossingRate(samples) {
+    if (!samples || samples.length < 2) {
+      return 0;
+    }
+
+    let crossings = 0;
+    for (let index = 1; index < samples.length; index += 1) {
+      const previous = samples[index - 1];
+      const current = samples[index];
+      if ((previous >= 0 && current < 0) || (previous < 0 && current >= 0)) {
+        crossings += 1;
+      }
+    }
+
+    return crossings / (samples.length - 1);
+  }
+
+  function average(values) {
+    if (!Array.isArray(values) || !values.length) {
+      return 0;
+    }
+
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+  }
+
+  function standardDeviation(values, meanValue) {
+    if (!Array.isArray(values) || values.length <= 1) {
+      return 0;
+    }
+
+    const mean = typeof meanValue === "number" ? meanValue : average(values);
+    const variance = values.reduce((sum, value) => sum + ((value - mean) * (value - mean)), 0) / values.length;
+    return Math.sqrt(variance);
+  }
+
+  function estimatePitch(samples, sampleRate) {
+    if (!samples || samples.length < 96) {
+      return { pitchHz: 0, confidence: 0 };
+    }
+
+    const minLag = Math.max(2, Math.floor(sampleRate / MAX_PITCH_HZ));
+    const maxLag = Math.min(samples.length - 2, Math.floor(sampleRate / MIN_PITCH_HZ));
+    if (maxLag <= minLag) {
+      return { pitchHz: 0, confidence: 0 };
+    }
+
+    let energy = 0;
+    for (let index = 0; index < samples.length; index += 1) {
+      energy += samples[index] * samples[index];
+    }
+
+    if (!energy) {
+      return { pitchHz: 0, confidence: 0 };
+    }
+
+    let bestCorrelation = 0;
+    let bestLag = 0;
+
+    for (let lag = minLag; lag <= maxLag; lag += 1) {
+      let correlation = 0;
+      for (let index = 0; index < samples.length - lag; index += 1) {
+        correlation += samples[index] * samples[index + lag];
+      }
+
+      const normalizedCorrelation = correlation / energy;
+      if (normalizedCorrelation > bestCorrelation) {
+        bestCorrelation = normalizedCorrelation;
+        bestLag = lag;
+      }
+    }
+
+    if (!bestLag || bestCorrelation < 0.28) {
+      return { pitchHz: 0, confidence: Math.max(0, bestCorrelation) };
+    }
+
+    return {
+      pitchHz: sampleRate / bestLag,
+      confidence: clamp(bestCorrelation, 0, 1),
+    };
+  }
+
+  function createProsodyAccumulator() {
+    return {
+      startedAt: Date.now(),
+      speechDurationMs: 0,
+      frameCount: 0,
+      pitchValues: [],
+      pitchConfidenceValues: [],
+      rmsValues: [],
+      peakValues: [],
+      zeroCrossingValues: [],
+    };
+  }
+
+  function buildProsodySummary(utterance) {
+    if (!utterance || !utterance.frameCount) {
+      return null;
+    }
+
+    const pitchMeanHz = average(utterance.pitchValues);
+    const rmsMean = average(utterance.rmsValues);
+    const peakMean = average(utterance.peakValues);
+    const zeroCrossingMean = average(utterance.zeroCrossingValues);
+
+    return {
+      capturedAt: Date.now(),
+      speechDurationMs: Math.round(utterance.speechDurationMs),
+      frameCount: utterance.frameCount,
+      voicedFrameRatio: utterance.frameCount ? utterance.pitchValues.length / utterance.frameCount : 0,
+      pitchMeanHz: Math.round(pitchMeanHz * 10) / 10,
+      pitchStdDevHz: Math.round(standardDeviation(utterance.pitchValues, pitchMeanHz) * 10) / 10,
+      pitchConfidence: Math.round(average(utterance.pitchConfidenceValues) * 1000) / 1000,
+      rmsMean: Math.round(rmsMean * 10000) / 10000,
+      rmsStdDev: Math.round(standardDeviation(utterance.rmsValues, rmsMean) * 10000) / 10000,
+      peakMean: Math.round(peakMean * 1000) / 1000,
+      zeroCrossingMean: Math.round(zeroCrossingMean * 1000) / 1000,
+    };
+  }
+
+  function appendProsodyFrame(utterance, samples, frameDurationMs) {
+    if (!utterance || !samples || !samples.length) {
+      return;
+    }
+
+    const rms = computeRms(samples);
+    const peak = computePeak(samples);
+    const zeroCrossingRate = computeZeroCrossingRate(samples);
+    const pitch = estimatePitch(samples, SPEECH_SAMPLE_RATE);
+
+    utterance.speechDurationMs += frameDurationMs;
+    utterance.frameCount += 1;
+    utterance.rmsValues.push(rms);
+    utterance.peakValues.push(peak);
+    utterance.zeroCrossingValues.push(zeroCrossingRate);
+
+    if (pitch.pitchHz >= MIN_PITCH_HZ && pitch.pitchHz <= MAX_PITCH_HZ && pitch.confidence >= 0.28) {
+      utterance.pitchValues.push(pitch.pitchHz);
+      utterance.pitchConfidenceValues.push(pitch.confidence);
+    }
   }
 
   function applyGain(samples, gain) {
@@ -329,6 +472,8 @@
         lastReportedIssue: null,
         lastQualityReportAt: 0,
         preRoll: [],
+        currentUtterance: null,
+        latestUtteranceProsody: null,
         streamClosed: false,
       };
 
@@ -458,17 +603,28 @@
 
         if (!state.speechActive && isSpeechCandidate && state.speechMs >= VAD_START_MS) {
           state.speechActive = true;
+          state.currentUtterance = createProsodyAccumulator();
           state.preRoll.forEach((preRollFrame) => this.writeToPushStream(state.pushStream, preRollFrame));
           state.preRoll = [];
           frameAlreadyWritten = true;
         }
 
         if (state.speechActive) {
+          if (!state.currentUtterance) {
+            state.currentUtterance = createProsodyAccumulator();
+          }
+
+          if (isSpeechCandidate) {
+            appendProsodyFrame(state.currentUtterance, normalized, frameDurationMs);
+          }
+
           if (!frameAlreadyWritten) {
             this.writeToPushStream(state.pushStream, frame);
           }
           if (!isSpeechCandidate && state.silenceMs >= VAD_RELEASE_MS) {
             state.speechActive = false;
+            state.latestUtteranceProsody = buildProsodySummary(state.currentUtterance);
+            state.currentUtterance = null;
             state.silenceMs = 0;
             state.preRoll = [];
           }
@@ -488,6 +644,7 @@
         stream,
         audioContext,
         createAudioConfig,
+        getProsodySummary: () => buildProsodySummary(state.currentUtterance) || state.latestUtteranceProsody,
         stopFeeding,
       };
     }
@@ -552,6 +709,9 @@
           language,
           resultAt,
           durationMs,
+          prosody: this.sourceType === "microphone" && this.microphoneState && typeof this.microphoneState.getProsodySummary === "function"
+            ? this.microphoneState.getProsodySummary()
+            : null,
           rawJson: detailed,
         });
       };

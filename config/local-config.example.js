@@ -6,4 +6,5 @@ window.LECTURE_ASSISTANT_LOCAL_CONFIG = {
   preferredProcessingLanguage: "",
   recognitionLanguages: ["en-US", "zh-TW"],
   segmentIntervalMinutes: 3,
+  interventionSensitivity: 7,
 };

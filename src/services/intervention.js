@@ -1,16 +1,5 @@
 (function () {
-  const DIRECT_INVOCATION_PATTERN = /\b(ai|assistant|copilot)\b|幫我|請你|請問你|可以幫我|能幫我|help me|can you|could you|what do you think/i;
-  const CLASSROOM_QUESTION_PATTERN = /不懂|怎麼做|為什麼|請問|可以解釋|這是什麼|what is|why\b|how do|how does|i don't understand|can you explain/i;
-  const HESITATION_PATTERN = /(^|\s)(呃|嗯|這個|那個|我想一下|well|uh|um|erm|let me think|maybe)(\s|$)/i;
-  const INTERVIEW_IMPLEMENTATION_PATTERN = /實作|做過|開發過|設計過|implemented|built|designed|handled|optimized|scaled|debugged|migrated|architecture|concurrency|parallel|latency|edge case/i;
   const MAX_HISTORY_ITEMS = 12;
-
-  function countWords(text) {
-    return String(text || "")
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean).length;
-  }
 
   function normalizeScenario(value) {
     return value === "interview" ? "interview" : "classroom";
@@ -51,16 +40,26 @@
     return normalizedTranscript.slice(-1800);
   }
 
+  function formatProsodySummary(prosody, interfaceLanguage) {
+    if (!prosody) {
+      return interfaceLanguage === "zh-TW" ? "無可用的本地語氣特徵。" : "No local prosody features were available.";
+    }
+
+    return [
+      `Speech duration: ${Math.round(Number(prosody.speechDurationMs) || 0)} ms`,
+      `Speech rate: ${Number(prosody.speechRateWpm) || 0} wpm`,
+      `Pitch mean: ${Number(prosody.pitchMeanHz) || 0} Hz`,
+      `Pitch variation: ${Number(prosody.pitchStdDevHz) || 0} Hz`,
+      `Pitch confidence: ${Number(prosody.pitchConfidence) || 0}`,
+      `Energy mean: ${Number(prosody.rmsMean) || 0}`,
+      `Energy variation: ${Number(prosody.rmsStdDev) || 0}`,
+      `Peak mean: ${Number(prosody.peakMean) || 0}`,
+      `Voiced frame ratio: ${Number(prosody.voicedFrameRatio) || 0}`,
+    ].join("\n");
+  }
+
   function detectTrigger(input) {
     const scenario = normalizeScenario(input.scenario);
-    const latestUtterance = String(input.latestUtterance || "").trim();
-    const detectedTerms = Array.isArray(input.detectedTerms) ? input.detectedTerms.filter(Boolean) : [];
-    const silenceMs = Number(input.silenceMs) || 0;
-    const pauseMs = Number(input.pauseMs) || 1500;
-    const pauseSatisfied = silenceMs >= Math.max(900, pauseMs - 150);
-    const wordCount = countWords(latestUtterance);
-    const hasDirectInvocation = DIRECT_INVOCATION_PATTERN.test(latestUtterance);
-    const hasTechnicalGap = detectedTerms.length > 0;
 
     if (input.qualityIssue) {
       return {
@@ -72,65 +71,15 @@
       };
     }
 
-    if (!latestUtterance) {
-      return { shouldIntervene: false, scenario };
-    }
-
-    if (hasDirectInvocation) {
-      return {
-        shouldIntervene: true,
-        scenario,
-        reason: "direct-invocation",
-        action: scenario === "interview" ? "SUGGEST" : "INTERVENE",
-        bypassCooldown: true,
-      };
-    }
-
-    if (!pauseSatisfied) {
-      return { shouldIntervene: false, scenario };
-    }
-
-    if (scenario === "classroom") {
-      if (CLASSROOM_QUESTION_PATTERN.test(latestUtterance)) {
-        return {
-          shouldIntervene: true,
-          scenario,
-          reason: "classroom-question",
-          action: "INTERVENE",
-        };
-      }
-
-      if (hasTechnicalGap && (HESITATION_PATTERN.test(latestUtterance) || wordCount <= 14)) {
-        return {
-          shouldIntervene: true,
-          scenario,
-          reason: "semantic-gap",
-          action: "INTERVENE",
-        };
-      }
-    }
-
-    if (scenario === "interview") {
-      if (INTERVIEW_IMPLEMENTATION_PATTERN.test(latestUtterance) && wordCount <= 24) {
-        return {
-          shouldIntervene: true,
-          scenario,
-          reason: "interview-follow-up",
-          action: "SUGGEST",
-        };
-      }
-
-      if (hasTechnicalGap && wordCount <= 18) {
-        return {
-          shouldIntervene: true,
-          scenario,
-          reason: "technical-follow-up",
-          action: "SUGGEST",
-        };
-      }
-    }
-
-    return { shouldIntervene: false, scenario };
+    return window.LocalProsodyService.analyze({
+      scenario,
+      interfaceLanguage: input.interfaceLanguage,
+      latestUtterance: input.latestUtterance,
+      prosody: input.prosody,
+      utteranceDurationMs: input.utteranceDurationMs,
+      silenceMs: input.silenceMs,
+      interventionSensitivity: input.interventionSensitivity,
+    });
   }
 
   function normalizeModelResponse(rawResponse, trigger) {
@@ -170,31 +119,51 @@
         return normalizeModelResponse(summarizeQualityIssue(input.qualityIssue, input.interfaceLanguage), trigger);
       }
 
-      const rawResponse = await window.GeminiService.generateIntervention({
-        geminiKey: input.geminiKey,
-        preferredProcessingLanguage: input.preferredProcessingLanguage,
-        interfaceLanguage: input.interfaceLanguage,
-        scenario: trigger.scenario,
-        triggerReason: trigger.reason,
-        recommendedAction: trigger.action,
-        latestUtterance: input.latestUtterance,
-        recentTranscript: buildRecentTranscript(input.transcript, input.latestUtterance),
-        lectureTitle: input.lectureTitle,
-        courseName: input.courseName,
-        topic: input.topic,
-        additionalContext: input.additionalContext,
-        detectedTerms: input.detectedTerms,
-        detectedLanguage: input.detectedLanguage,
-        pauseMs: input.pauseMs,
-        silenceMs: input.silenceMs,
-      });
+      if (!input.geminiKey) {
+        return normalizeModelResponse(trigger.localResponse, {
+          ...trigger,
+          localOnly: true,
+        });
+      }
+
+      let rawResponse = "";
+      try {
+        rawResponse = await window.GeminiService.generateIntervention({
+          geminiKey: input.geminiKey,
+          preferredProcessingLanguage: input.preferredProcessingLanguage,
+          interfaceLanguage: input.interfaceLanguage,
+          scenario: trigger.scenario,
+          triggerReason: trigger.reason,
+          recommendedAction: trigger.action,
+          latestUtterance: input.latestUtterance,
+          recentTranscript: buildRecentTranscript(input.transcript, input.latestUtterance),
+          lectureTitle: input.lectureTitle,
+          courseName: input.courseName,
+          topic: input.topic,
+          additionalContext: input.additionalContext,
+          detectedTerms: input.detectedTerms,
+          detectedLanguage: input.detectedLanguage,
+          pauseMs: input.pauseMs,
+          silenceMs: input.silenceMs,
+          triggerScore: trigger.score,
+          triggerThreshold: trigger.threshold,
+          prosodySummary: formatProsodySummary(trigger.prosodySummary || input.prosody, input.interfaceLanguage),
+          triggerLabel: trigger.triggerLabel,
+        });
+      } catch (error) {
+        console.warn("Gemini intervention fallback to local tone response", error);
+      }
 
       const normalized = normalizeModelResponse(rawResponse, trigger);
       if (!normalized) {
-        return null;
+        return normalizeModelResponse(trigger.localResponse, {
+          ...trigger,
+          localOnly: true,
+        });
       }
 
       normalized.bypassCooldown = Boolean(trigger.bypassCooldown);
+      normalized.triggerScore = trigger.score;
       return normalized;
     },
 

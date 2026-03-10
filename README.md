@@ -2,6 +2,8 @@
 
 Lecture Assistant is a browser-only lecture transcription and note generation tool for university students. It uses Azure Speech Service for continuous live transcription, Gemini for structured Markdown notes, IndexedDB for local-first persistence, and optional uploaded course materials to improve summaries.
 
+The live intervention flow now uses a browser-local prosody model for triggering. It listens to tone, energy, pitch variation, and pause behavior instead of keyword rules, and can optionally use Gemini only to phrase a richer intervention message.
+
 ## Project Tree
 
 ```text
@@ -23,9 +25,13 @@ lecture-assistant/
 │   │   ├── storage.js
 │   │   └── transcript.js
 │   ├── services/
+│   │   ├── prosody.js
 │   │   ├── gemini.js
 │   │   ├── rag.js
 │   │   └── speech.js
+│   ├── app/
+│   │   ├── app-controller.js
+│   │   └── lecture-manager.js
 │   └── ui/
 │       └── ui.js
 └── README.md
@@ -53,11 +59,15 @@ Microphone input
 - `src/core/storage.js`: IndexedDB wrapper for lectures, settings, and refresh recovery drafts.
 - `src/core/settings.js`: local settings defaults, normalization, and persistence.
 - `src/core/transcript.js`: paragraph segmentation, transcript buffering, topic-shift heuristics, technical term detection, and transcript highlighting.
-- `src/services/speech.js`: Azure Speech continuous recognition client with reconnect logic and microphone permission handling.
+- `src/services/speech.js`: Azure Speech continuous recognition client with reconnect logic, microphone permission handling, and local prosody feature capture.
+- `src/services/prosody.js`: browser-local tone/prosody scoring used to trigger live interventions without keyword matching.
 - `src/services/rag.js`: reference document parsing for `.txt`, `.md`, and `.pdf` plus lightweight chunk ranking.
 - `src/services/gemini.js`: Gemini API client and hierarchical note generation for long transcripts.
+- `src/services/intervention.js`: intervention orchestration that combines local tone triggers with Gemini phrasing fallback.
+- `src/app/app-controller.js`: application orchestration and live intervention scheduling.
+- `src/app/lecture-manager.js`: lecture state creation and transcript restoration helpers.
 - `src/ui/ui.js`: DOM rendering and user interaction helpers.
-- `src/app.js`: top-level orchestration, autosave, wake lock handling, lecture lifecycle, and module wiring.
+- `src/app.js`: bootstrap entry point.
 - `config/local-config.example.js`: tracked template for local browser config values.
 - `scripts/generate-local-config.ps1`: converts a local `.env` file into `config/local-config.js` for browser use.
 
@@ -68,6 +78,8 @@ Microphone input
 - Optional primary lecture language setting that forces speech and note generation to use one language, with auto-detect as the fallback
 - Mixed-language speech recognition configuration for English and Traditional Chinese
 - Microphone preprocessing with browser echo cancellation, noise suppression, auto gain control, frequency filtering, compression, and silence gating before Azure Speech recognition
+- Browser-local tone triggering for live intervention using prosody features instead of keyword rules
+- Adjustable local tone-trigger sensitivity, with local fallback intervention messages when Gemini is unavailable
 - Partial and final transcript display
 - Technical term detection and transcript highlighting
 - Automatic transcript paragraphing on pauses, length limits, and topic-shift cues
@@ -132,9 +144,10 @@ The supported local workflow is:
 3. Enter:
    - Azure Speech API key
    - Azure Speech region
-   - Gemini API key
+   - Gemini API key (optional for richer intervention wording; local tone triggering still works without it)
    - optional primary lecture language such as `en-US` or `zh-TW` (leave blank for auto-detect)
    - recognition languages such as `en-US, zh-TW`
+   - local tone trigger sensitivity from `1` to `10`
 4. Save settings.
 5. Click `Start Recording`.
 6. Click `Stop Recording` when the lecture ends.
@@ -165,9 +178,26 @@ Fields:
 - `Azure Region`
 - `Gemini API Key`
 - `Primary Lecture Language`
+- `Local Tone Trigger Sensitivity`
 - `Recognition Languages`
 - `Segment Interval Fallback`
 - `Interface Language`
+
+## Live Intervention Triggering
+
+The app no longer relies on keyword matching to decide when live intervention should fire.
+
+Instead, microphone audio is analyzed in the browser to extract a small prosody summary for each utterance, including:
+
+- pitch mean and pitch variation
+- energy mean and energy variation
+- voiced-frame ratio
+- zero-crossing rate
+- utterance duration and speech rate
+
+These signals are scored by `src/services/prosody.js` to estimate whether the latest utterance sounds uncertain, urgent, or strained. If the score crosses the configured sensitivity threshold, the intervention pipeline triggers after a VAD-confirmed pause.
+
+If a Gemini API key is present, Gemini receives the local trigger decision plus the prosody summary and returns a concise intervention. If Gemini is unavailable, the app still emits a local fallback intervention message.
 
 ## Transcript Reliability Design
 

@@ -10,6 +10,7 @@
     interventionEnabled: true,
     assistantScenario: "classroom",
     interventionPauseMs: 1500,
+    interventionSensitivity: 7,
   };
 
   const LOCAL_OVERRIDE_FIELDS = [
@@ -23,6 +24,7 @@
     "interventionEnabled",
     "assistantScenario",
     "interventionPauseMs",
+    "interventionSensitivity",
   ];
 
   function getLocalConfig() {
@@ -91,6 +93,7 @@
       normalized.interventionEnabled = normalized.interventionEnabled !== false;
       normalized.assistantScenario = normalized.assistantScenario === "interview" ? "interview" : "classroom";
       normalized.interventionPauseMs = Math.min(5000, Math.max(1000, Number(normalized.interventionPauseMs) || DEFAULT_SETTINGS.interventionPauseMs));
+      normalized.interventionSensitivity = Math.min(10, Math.max(1, Math.round(Number(normalized.interventionSensitivity) || DEFAULT_SETTINGS.interventionSensitivity)));
 
       normalized.segmentIntervalMinutes = Math.min(15, Math.max(1, Number(normalized.segmentIntervalMinutes) || DEFAULT_SETTINGS.segmentIntervalMinutes));
       return normalized;

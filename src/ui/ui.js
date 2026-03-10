@@ -702,16 +702,16 @@
       const locale = this.currentLanguage === "zh-TW" ? "zh-TW" : "en-US";
       this.refs.interventionList.innerHTML = interventions
         .map((item) => {
+          // 移除 QUALITY_ALERT 顯示
+          if (item.action === "QUALITY_ALERT") {
+            return "";
+          }
           const actionLabel = item.action === "SUGGEST"
             ? this.t("actionSuggest")
-            : item.action === "QUALITY_ALERT"
-              ? this.t("actionQualityAlert")
-              : this.t("actionIntervene");
-          const toneClass = item.action === "QUALITY_ALERT"
-            ? "border-amber-200 bg-amber-50"
-            : item.action === "SUGGEST"
-              ? "border-sky-200 bg-sky-50"
-              : "border-emerald-200 bg-emerald-50";
+            : this.t("actionIntervene");
+          const toneClass = item.action === "SUGGEST"
+            ? "border-sky-200 bg-sky-50"
+            : "border-emerald-200 bg-emerald-50";
 
           return `
             <article class="rounded-2xl border px-4 py-3 ${toneClass}">

@@ -7,6 +7,9 @@
     preferredProcessingLanguage: "",
     recognitionLanguages: ["en-US", "zh-TW"],
     segmentIntervalMinutes: 3,
+    interventionEnabled: true,
+    assistantScenario: "classroom",
+    interventionPauseMs: 1500,
   };
 
   const LOCAL_OVERRIDE_FIELDS = [
@@ -17,6 +20,9 @@
     "preferredProcessingLanguage",
     "recognitionLanguages",
     "segmentIntervalMinutes",
+    "interventionEnabled",
+    "assistantScenario",
+    "interventionPauseMs",
   ];
 
   function getLocalConfig() {
@@ -81,6 +87,10 @@
       normalized.preferredProcessingLanguage = typeof normalized.preferredProcessingLanguage === "string"
         ? normalized.preferredProcessingLanguage.trim()
         : "";
+
+      normalized.interventionEnabled = normalized.interventionEnabled !== false;
+      normalized.assistantScenario = normalized.assistantScenario === "interview" ? "interview" : "classroom";
+      normalized.interventionPauseMs = Math.min(5000, Math.max(1000, Number(normalized.interventionPauseMs) || DEFAULT_SETTINGS.interventionPauseMs));
 
       normalized.segmentIntervalMinutes = Math.min(15, Math.max(1, Number(normalized.segmentIntervalMinutes) || DEFAULT_SETTINGS.segmentIntervalMinutes));
       return normalized;

@@ -1,6 +1,6 @@
 (function () {
   const LectureManager = {
-    createTemplate(interfaceLanguage) {
+    createTemplate(interfaceLanguage, assistantScenario) {
       const now = Date.now();
       return {
         id: `lecture-${now}`,
@@ -15,11 +15,13 @@
         topic: "",
         additionalContext: "",
         interfaceLanguage: interfaceLanguage || "en",
+        assistantScenario: assistantScenario === "interview" ? "interview" : "classroom",
         paragraphs: [],
         segments: [],
         transcriptState: null,
         documents: [],
         uploadedMedia: null,
+        aiInterventions: [],
       };
     },
 
@@ -43,6 +45,8 @@
       lecture.additionalContext = safeFormData.additionalContext || "";
       lecture.interfaceLanguage = safeFormData.interfaceLanguage || lecture.interfaceLanguage || "en";
       lecture.documents = Array.isArray(documents) ? documents : [];
+      lecture.aiInterventions = Array.isArray(lecture.aiInterventions) ? lecture.aiInterventions : [];
+      lecture.assistantScenario = lecture.assistantScenario === "interview" ? "interview" : "classroom";
       lecture.updatedAt = Date.now();
       return lecture;
     },

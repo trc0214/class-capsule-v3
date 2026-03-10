@@ -13,6 +13,15 @@
       activeCaptureMode: null,
       activeMediaInfo: null,
       audioQualityIssue: null,
+      latestAudioQualityPayload: null,
+      interventionTimerId: null,
+      interventionInFlight: false,
+      lastRecognizedPayload: null,
+      lastRecognitionUpdate: null,
+      lastInterventionSignature: "",
+      lastInterventionAt: 0,
+      lastQualityAlertIssue: null,
+      manualQuestionInFlight: false,
 
       async init() {
         await window.AppStorage.init();
@@ -44,6 +53,10 @@
         return {
           onRecognizing: (payload) => {
             window.UI.renderPartial(payload.text);
+            this.cancelPendingIntervention();
+            if (this.isRecording && this.activeCaptureMode === "microphone") {
+              this.renderInterventionPanel(window.UI.t("interventionMonitoring"));
+            }
           },
           onRecognized: (payload) => {
             const update = this.transcriptProcessor.consumeFinalResult(payload);
@@ -54,7 +67,9 @@
             this.ensureCurrentLecture();
             window.LectureManager.syncTranscriptState(this.currentLecture, this.transcriptProcessor, this.currentDocuments);
             this.currentLecture.technicalTerms = update.technicalTerms;
+            this.currentLecture.assistantScenario = window.SettingsManager.get().assistantScenario;
             this.renderCurrentLecture();
+            this.scheduleInterventionEvaluation(payload, update);
           },
           onStatus: (message) => {
             if ((message === "Listening" || message === "Reconnected") && this.audioQualityIssue && this.activeCaptureMode === "microphone") {
@@ -75,8 +90,24 @@
             }
 
             this.audioQualityIssue = nextIssue;
+            this.latestAudioQualityPayload = payload || null;
+
+            if (payload && payload.isSpeechDetected) {
+              this.cancelPendingIntervention();
+            }
+
             if (this.isRecording) {
               window.UI.setSpeechStatus(this.getAudioQualityStatus(nextIssue));
+            }
+
+            if (!nextIssue) {
+              this.lastQualityAlertIssue = null;
+            }
+
+            if (nextIssue) {
+              this.addQualityAlertIntervention(nextIssue).catch((error) => console.error("Quality alert intervention failed", error));
+            } else if (this.isRecording) {
+              this.renderInterventionPanel(window.UI.t("interventionMonitoring"));
             }
           },
           onError: (error) => {
@@ -100,6 +131,7 @@
           onNewLecture: () => this.prepareNewLecture(),
           onMediaUpload: (event) => this.handleMediaUpload(event),
           onDocumentUpload: (event) => this.handleDocumentUpload(event),
+          onManualQuestion: (event) => this.handleManualQuestion(event),
           onSaveSettings: (event) => this.handleSaveSettings(event),
           onResetSettings: () => this.handleResetSettings(),
           onLectureMetadataChange: () => this.handleLectureMetadataChange(),
@@ -107,7 +139,8 @@
       },
 
       createLectureTemplate() {
-        return window.LectureManager.createTemplate(window.SettingsManager.get().interfaceLanguage);
+        const settings = window.SettingsManager.get();
+        return window.LectureManager.createTemplate(settings.interfaceLanguage, settings.assistantScenario);
       },
 
       createTranscriptProcessor(lecture) {
@@ -118,6 +151,11 @@
         if (!this.currentLecture) {
           this.currentLecture = this.createLectureTemplate();
         }
+
+        this.currentLecture.aiInterventions = Array.isArray(this.currentLecture.aiInterventions) ? this.currentLecture.aiInterventions : [];
+        this.currentLecture.assistantScenario = this.currentLecture.assistantScenario === "interview"
+          ? "interview"
+          : (window.SettingsManager.get().assistantScenario || "classroom");
       },
 
       syncLectureFromForm() {
@@ -135,7 +173,270 @@
         this.activeCaptureMode = null;
         this.activeMediaInfo = null;
         this.audioQualityIssue = null;
+        this.latestAudioQualityPayload = null;
         this.transcriptProcessor = this.createTranscriptProcessor(null);
+        this.resetInterventionRuntimeState();
+      },
+
+      resetInterventionRuntimeState() {
+        this.cancelPendingIntervention();
+        this.interventionInFlight = false;
+        this.lastRecognizedPayload = null;
+        this.lastRecognitionUpdate = null;
+        this.lastInterventionSignature = "";
+        this.lastInterventionAt = 0;
+        this.lastQualityAlertIssue = null;
+        this.manualQuestionInFlight = false;
+      },
+
+      cancelPendingIntervention() {
+        if (this.interventionTimerId) {
+          window.clearTimeout(this.interventionTimerId);
+          this.interventionTimerId = null;
+        }
+      },
+
+      getInterventionStatusMessage(statusOverride) {
+        if (statusOverride) {
+          return statusOverride;
+        }
+
+        const settings = window.SettingsManager.get();
+        if (!settings.interventionEnabled) {
+          return window.UI.t("interventionDisabled");
+        }
+
+        if (!settings.geminiKey) {
+          return window.UI.t("interventionUnavailable");
+        }
+
+        if (this.isRecording && this.activeCaptureMode === "microphone") {
+          return window.UI.t("interventionMonitoring");
+        }
+
+        return window.UI.t("interventionIdle");
+      },
+
+      renderInterventionPanel(statusOverride) {
+        this.ensureCurrentLecture();
+        window.UI.setInterventionScenario(this.currentLecture.assistantScenario || window.SettingsManager.get().assistantScenario || "classroom");
+        window.UI.setInterventionStatus(this.getInterventionStatusMessage(statusOverride));
+        window.UI.renderInterventions(this.currentLecture.aiInterventions || []);
+      },
+
+      scheduleInterventionEvaluation(payload, update) {
+        const settings = window.SettingsManager.get();
+        if (!settings.interventionEnabled || !settings.geminiKey || this.activeCaptureMode !== "microphone") {
+          this.renderInterventionPanel();
+          return;
+        }
+
+        this.lastRecognizedPayload = payload;
+        this.lastRecognitionUpdate = update;
+        this.cancelPendingIntervention();
+        this.renderInterventionPanel(window.UI.t("interventionWaitingForPause"));
+
+        this.interventionTimerId = window.setTimeout(() => {
+          this.maybeEvaluateIntervention().catch((error) => {
+            console.error("Intervention evaluation failed", error);
+            this.renderInterventionPanel();
+          });
+        }, Math.max(1000, settings.interventionPauseMs));
+      },
+
+      buildInterventionSignature(intervention) {
+        return [
+          intervention.action,
+          intervention.triggerReason,
+          intervention.message,
+          this.lastRecognizedPayload && this.lastRecognizedPayload.text,
+        ].join("|").toLowerCase();
+      },
+
+      shouldSkipIntervention(intervention) {
+        const signature = this.buildInterventionSignature(intervention);
+        if (signature === this.lastInterventionSignature) {
+          return true;
+        }
+
+        if (!intervention.bypassCooldown && Date.now() - this.lastInterventionAt < 8000) {
+          return true;
+        }
+
+        this.lastInterventionSignature = signature;
+        this.lastInterventionAt = Date.now();
+        return false;
+      },
+
+      appendIntervention(intervention) {
+        this.ensureCurrentLecture();
+        const nextEntry = {
+          action: intervention.action || "INTERVENE",
+          message: intervention.message || "",
+          createdAt: Date.now(),
+          triggerReason: intervention.triggerReason || "unknown",
+          scenario: intervention.scenario || this.currentLecture.assistantScenario,
+          source: intervention.source || "gemini",
+          userQuestion: intervention.userQuestion || "",
+        };
+
+        this.currentLecture.aiInterventions = [nextEntry].concat(this.currentLecture.aiInterventions || []).slice(0, window.InterventionService.MAX_HISTORY_ITEMS || 12);
+        this.currentLecture.updatedAt = Date.now();
+        this.renderInterventionPanel();
+      },
+
+      async handleManualQuestion(event) {
+        event.preventDefault();
+
+        const settings = window.SettingsManager.get();
+        if (!settings.geminiKey) {
+          window.UI.showToast(window.UI.t("manualQuestionUnavailable"), "error");
+          window.UI.openSettings();
+          return;
+        }
+
+        const question = window.UI.getManualQuestion();
+        if (!question) {
+          window.UI.showToast(window.UI.t("manualQuestionEmpty"), "error");
+          return;
+        }
+
+        if (this.manualQuestionInFlight) {
+          return;
+        }
+
+        this.ensureCurrentLecture();
+        this.syncLectureFromForm();
+        this.manualQuestionInFlight = true;
+        window.UI.setManualQuestionBusy(true);
+        this.renderInterventionPanel(window.UI.t("manualQuestionSending"));
+
+        try {
+          const intervention = await window.InterventionService.manualAsk({
+            geminiKey: settings.geminiKey,
+            preferredProcessingLanguage: settings.preferredProcessingLanguage,
+            interfaceLanguage: this.currentLecture && this.currentLecture.interfaceLanguage ? this.currentLecture.interfaceLanguage : settings.interfaceLanguage,
+            scenario: this.currentLecture && this.currentLecture.assistantScenario ? this.currentLecture.assistantScenario : settings.assistantScenario,
+            question,
+            transcript: this.transcriptProcessor.getTranscriptText(),
+            lectureTitle: this.currentLecture && this.currentLecture.title,
+            courseName: this.currentLecture && this.currentLecture.courseName,
+            topic: this.currentLecture && this.currentLecture.topic,
+            additionalContext: this.currentLecture && this.currentLecture.additionalContext,
+            detectedTerms: this.transcriptProcessor.getTechnicalTerms(),
+            detectedLanguage: this.lastRecognizedPayload && this.lastRecognizedPayload.language,
+          });
+
+          if (intervention) {
+            this.appendIntervention(intervention);
+            await this.persistDraft(false);
+          } else {
+            this.renderInterventionPanel();
+          }
+
+          window.UI.clearManualQuestion();
+        } catch (error) {
+          console.error(error);
+          window.UI.showToast(error.message, "error");
+          this.renderInterventionPanel();
+        } finally {
+          this.manualQuestionInFlight = false;
+          window.UI.setManualQuestionBusy(false);
+        }
+      },
+
+      async addQualityAlertIntervention(issue) {
+        const settings = window.SettingsManager.get();
+        if (!settings.interventionEnabled || this.lastQualityAlertIssue === issue) {
+          return;
+        }
+
+        const intervention = await window.InterventionService.evaluate({
+          scenario: this.currentLecture && this.currentLecture.assistantScenario,
+          qualityIssue: issue,
+          interfaceLanguage: this.currentLecture && this.currentLecture.interfaceLanguage ? this.currentLecture.interfaceLanguage : settings.interfaceLanguage,
+        });
+
+        if (intervention) {
+          intervention.bypassCooldown = true;
+        }
+
+        if (!intervention || this.shouldSkipIntervention(intervention)) {
+          return;
+        }
+
+        this.lastQualityAlertIssue = issue;
+        this.appendIntervention(intervention);
+      },
+
+      async maybeEvaluateIntervention() {
+        const settings = window.SettingsManager.get();
+        if (!this.isRecording || this.activeCaptureMode !== "microphone" || this.interventionInFlight || !this.lastRecognizedPayload) {
+          this.renderInterventionPanel();
+          return;
+        }
+
+        if (!settings.interventionEnabled || !settings.geminiKey) {
+          this.renderInterventionPanel();
+          return;
+        }
+
+        if (this.audioQualityIssue) {
+          await this.addQualityAlertIntervention(this.audioQualityIssue);
+          this.renderInterventionPanel();
+          return;
+        }
+
+        const vadState = this.latestAudioQualityPayload;
+        if (vadState && vadState.isSpeechDetected) {
+          this.renderInterventionPanel(window.UI.t("interventionWaitingForPause"));
+          return;
+        }
+
+        const silenceMs = vadState && typeof vadState.silenceMs === "number" ? vadState.silenceMs : settings.interventionPauseMs;
+        if (silenceMs < settings.interventionPauseMs) {
+          this.renderInterventionPanel(window.UI.t("interventionWaitingForPause"));
+          this.cancelPendingIntervention();
+          this.interventionTimerId = window.setTimeout(() => {
+            this.maybeEvaluateIntervention().catch((error) => {
+              console.error("Intervention reevaluation failed", error);
+              this.renderInterventionPanel();
+            });
+          }, 400);
+          return;
+        }
+
+        this.interventionInFlight = true;
+        this.renderInterventionPanel(window.UI.t("interventionEvaluating"));
+
+        try {
+          const intervention = await window.InterventionService.evaluate({
+            geminiKey: settings.geminiKey,
+            preferredProcessingLanguage: settings.preferredProcessingLanguage,
+            interfaceLanguage: this.currentLecture && this.currentLecture.interfaceLanguage ? this.currentLecture.interfaceLanguage : settings.interfaceLanguage,
+            scenario: this.currentLecture && this.currentLecture.assistantScenario ? this.currentLecture.assistantScenario : settings.assistantScenario,
+            latestUtterance: this.lastRecognizedPayload.text,
+            detectedLanguage: this.lastRecognizedPayload.language,
+            detectedTerms: this.lastRecognitionUpdate && this.lastRecognitionUpdate.technicalTerms
+              ? this.lastRecognitionUpdate.technicalTerms
+              : window.TranscriptProcessor.detectTechnicalTerms(this.lastRecognizedPayload.text),
+            transcript: this.transcriptProcessor.getTranscriptText(),
+            lectureTitle: this.currentLecture && this.currentLecture.title,
+            courseName: this.currentLecture && this.currentLecture.courseName,
+            topic: this.currentLecture && this.currentLecture.topic,
+            additionalContext: this.currentLecture && this.currentLecture.additionalContext,
+            pauseMs: settings.interventionPauseMs,
+            silenceMs,
+          });
+
+          if (intervention && !this.shouldSkipIntervention(intervention)) {
+            this.appendIntervention(intervention);
+          } else {
+            this.renderInterventionPanel();
+          }
+        } finally {
+          this.interventionInFlight = false;
+        }
       },
 
       getAudioQualityStatus(issue) {
@@ -193,6 +494,9 @@
         window.UI.renderNotes("");
         window.UI.setSpeechStatus(window.UI.t("idle"));
         window.UI.setNotesStatus(window.UI.t("ready"));
+        window.UI.clearManualQuestion();
+        window.UI.setManualQuestionBusy(false);
+        this.renderInterventionPanel();
         this.renderCurrentLecture();
       },
 
@@ -204,6 +508,7 @@
         window.UI.renderDocuments(this.currentDocuments);
         window.UI.renderUploadedMedia(window.LectureManager.getUploadedMedia(this.currentLecture), this.getUploadedMediaStatusMessage());
         window.UI.renderNotes(this.currentLecture.notes || "");
+        this.renderInterventionPanel();
       },
 
       getUploadedMediaStatusMessage() {
@@ -237,6 +542,7 @@
         this.currentDocuments = window.LectureManager.getDocuments(lecture);
         this.activeMediaInfo = window.LectureManager.getUploadedMedia(lecture);
         this.transcriptProcessor = this.createTranscriptProcessor(lecture);
+        this.resetInterventionRuntimeState();
         window.UI.setLectureFormData(lecture);
         window.UI.setLanguage(lecture.interfaceLanguage || window.SettingsManager.get().interfaceLanguage);
         window.UI.renderPartial("");
@@ -255,6 +561,7 @@
         this.currentDocuments = window.LectureManager.getDocuments(draft.lecture);
         this.activeMediaInfo = window.LectureManager.getUploadedMedia(draft.lecture);
         this.transcriptProcessor = this.createTranscriptProcessor(draft.lecture);
+        this.resetInterventionRuntimeState();
         window.UI.setLectureFormData(this.currentLecture);
         window.UI.setLanguage(this.currentLecture.interfaceLanguage || window.SettingsManager.get().interfaceLanguage);
         this.renderCurrentLecture();
@@ -377,6 +684,9 @@
         try {
           await this.requestWakeLock();
           this.audioQualityIssue = null;
+          this.latestAudioQualityPayload = null;
+          this.resetInterventionRuntimeState();
+          this.currentLecture.assistantScenario = settings.assistantScenario;
           await this.speechService.start({
             azureKey: settings.azureKey,
             azureRegion: settings.azureRegion,
@@ -392,6 +702,7 @@
           this.startAutosave();
           this.startDurationTicker();
           window.UI.setSpeechStatus(window.UI.t("listening"));
+          this.renderInterventionPanel();
           this.renderCurrentLecture();
           await this.persistDraft(false);
         } catch (error) {
@@ -411,9 +722,11 @@
         this.isRecording = false;
         this.activeCaptureMode = null;
         this.audioQualityIssue = null;
+        this.latestAudioQualityPayload = null;
         this.transcriptProcessor.flushAll();
         this.stopAutosave();
         this.stopDurationTicker();
+        this.cancelPendingIntervention();
 
         if (finishedMode === "microphone") {
           await this.releaseWakeLock();
@@ -635,6 +948,7 @@
         window.UI.setLanguage(settings.interfaceLanguage);
         if (this.currentLecture) {
           this.currentLecture.interfaceLanguage = settings.interfaceLanguage;
+          this.currentLecture.assistantScenario = settings.assistantScenario;
         }
 
         const transcriptState = this.transcriptProcessor.getState();
@@ -652,6 +966,9 @@
         const settings = await window.SettingsManager.reset();
         window.UI.setSettingsForm(settings);
         window.UI.setLanguage(settings.interfaceLanguage);
+        if (this.currentLecture) {
+          this.currentLecture.assistantScenario = settings.assistantScenario;
+        }
         this.renderCurrentLecture();
         window.UI.showToast(window.UI.t("settingsReset"));
       },

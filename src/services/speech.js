@@ -261,6 +261,8 @@
         peak: metrics.peak,
         noiseFloor: state.noiseFloor,
         isSpeechDetected: state.speechActive,
+        silenceMs: state.silenceMs,
+        speechMs: state.speechMs,
         sourceType: this.sourceType,
       });
     }

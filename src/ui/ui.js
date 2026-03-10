@@ -38,6 +38,30 @@
       unsupportedMediaFile: "Please upload an audio or video file.",
       detectedTechnicalTerms: "Detected Technical Terms",
       partialRecognition: "Partial Recognition",
+      liveInterventionAssistant: "Live Intervention Assistant",
+      interventionIdle: "Monitoring is idle.",
+      interventionMonitoring: "Monitoring for intervention opportunities.",
+      interventionUnavailable: "Add a Gemini API key to enable live intervention.",
+      interventionDisabled: "Live intervention assistant is disabled.",
+      interventionEvaluating: "Analyzing whether AI should intervene...",
+      interventionWaitingForPause: "Waiting for a VAD-confirmed pause before evaluating.",
+      interventionEnabled: "Live Intervention Assistant",
+      interventionEnabledHelp: "Use VAD, audio quality, and scenario rules to decide whether AI should interject during recording.",
+      interventionScenario: "Intervention Scenario",
+      interventionPauseThreshold: "Intervention Pause Threshold (ms)",
+      scenarioClassroom: "Classroom",
+      scenarioInterview: "Interview",
+      noInterventionsYet: "No intervention suggestions yet.",
+      actionIntervene: "Intervene",
+      actionSuggest: "Suggest",
+      actionQualityAlert: "Quality Alert",
+      manualQuestion: "Manual Question",
+      manualQuestionPlaceholder: "Ask the assistant to explain, clarify, or suggest a follow-up.",
+      manualQuestionHint: "This sends an immediate request using the current scenario and transcript context.",
+      askNow: "Ask Now",
+      manualQuestionEmpty: "Enter a question before sending it.",
+      manualQuestionSending: "Sending manual question...",
+      manualQuestionUnavailable: "Add a Gemini API key before using manual questions.",
       waitingForSpeech: "Waiting for speech input.",
       aiNotes: "AI Notes",
       markdownLectureNotes: "Markdown lecture notes",
@@ -126,6 +150,30 @@
       unsupportedMediaFile: "請上傳音訊或影片檔。",
       detectedTechnicalTerms: "偵測到的技術名詞",
       partialRecognition: "即時辨識片段",
+      liveInterventionAssistant: "即時介入助理",
+      interventionIdle: "介入監聽目前閒置中。",
+      interventionMonitoring: "正在監聽是否需要 AI 介入。",
+      interventionUnavailable: "請先填入 Gemini API 金鑰以啟用即時介入。",
+      interventionDisabled: "即時介入助理目前已停用。",
+      interventionEvaluating: "正在分析是否需要 AI 介入...",
+      interventionWaitingForPause: "正在等待 VAD 確認停頓後再判斷是否介入。",
+      interventionEnabled: "即時介入助理",
+      interventionEnabledHelp: "結合 VAD、音訊品質與場景規則，判斷錄音中是否需要 AI 主動切入。",
+      interventionScenario: "介入情境",
+      interventionPauseThreshold: "介入停頓門檻（毫秒）",
+      scenarioClassroom: "課堂",
+      scenarioInterview: "面試",
+      noInterventionsYet: "目前尚無介入建議。",
+      actionIntervene: "主動介入",
+      actionSuggest: "追問建議",
+      actionQualityAlert: "品質警告",
+      manualQuestion: "手動提問",
+      manualQuestionPlaceholder: "主動詢問助理解釋、補充或提供追問建議。",
+      manualQuestionHint: "會依照目前情境與逐字稿內容，立即送出一次即時請求。",
+      askNow: "立即提問",
+      manualQuestionEmpty: "請先輸入提問內容。",
+      manualQuestionSending: "正在送出手動提問...",
+      manualQuestionUnavailable: "請先填入 Gemini API 金鑰後再使用手動提問。",
       waitingForSpeech: "等待語音輸入。",
       aiNotes: "AI 筆記",
       markdownLectureNotes: "Markdown 講座筆記",
@@ -252,6 +300,15 @@
         referenceDocumentsHelp: document.querySelector("#documentList").previousElementSibling.querySelector("p.mt-2.text-sm.leading-6"),
         technicalTermsTitle: document.querySelector("#termList").previousElementSibling,
         partialRecognitionTitle: document.querySelector("#partialTranscript").previousElementSibling,
+        interventionPanelLabel: document.getElementById("interventionPanelLabel"),
+        interventionStatus: document.getElementById("interventionStatus"),
+        interventionScenarioBadge: document.getElementById("interventionScenarioBadge"),
+        manualQuestionForm: document.getElementById("manualQuestionForm"),
+        manualQuestionLabel: document.getElementById("manualQuestionLabel"),
+        manualQuestionInput: document.getElementById("manualQuestionInput"),
+        manualQuestionHint: document.getElementById("manualQuestionHint"),
+        manualQuestionButton: document.getElementById("manualQuestionButton"),
+        interventionList: document.getElementById("interventionList"),
         startButton: document.getElementById("startButton"),
         stopButton: document.getElementById("stopButton"),
         generateNotesButton: document.getElementById("generateNotesButton"),
@@ -270,6 +327,9 @@
         azureRegionInput: document.getElementById("azureRegionInput"),
         geminiKeyInput: document.getElementById("geminiKeyInput"),
         preferredProcessingLanguageInput: document.getElementById("preferredProcessingLanguageInput"),
+        interventionEnabledInput: document.getElementById("interventionEnabledInput"),
+        assistantScenarioInput: document.getElementById("assistantScenarioInput"),
+        interventionPauseInput: document.getElementById("interventionPauseInput"),
         recognitionLanguagesInput: document.getElementById("recognitionLanguagesInput"),
         segmentIntervalInput: document.getElementById("segmentIntervalInput"),
         settingsLanguageInput: document.getElementById("settingsLanguageInput"),
@@ -283,6 +343,10 @@
         azureRegionLabel: document.querySelector("#azureRegionInput").previousElementSibling,
         geminiKeyLabel: document.querySelector("#geminiKeyInput").previousElementSibling,
         preferredProcessingLanguageLabel: document.querySelector("#preferredProcessingLanguageInput").previousElementSibling,
+        interventionEnabledLabel: document.getElementById("interventionEnabledLabel"),
+        interventionEnabledHelp: document.getElementById("interventionEnabledHelp"),
+        assistantScenarioLabel: document.getElementById("assistantScenarioLabel"),
+        interventionPauseLabel: document.getElementById("interventionPauseLabel"),
         recognitionLanguagesLabel: document.querySelector("#recognitionLanguagesInput").previousElementSibling,
         segmentIntervalLabel: document.querySelector("#segmentIntervalInput").previousElementSibling,
         settingsLanguageLabel: document.querySelector("#settingsLanguageInput").previousElementSibling,
@@ -334,6 +398,11 @@
       this.refs.mediaUploadButtonText.textContent = this.t("upload");
       this.refs.technicalTermsTitle.textContent = this.t("detectedTechnicalTerms");
       this.refs.partialRecognitionTitle.textContent = this.t("partialRecognition");
+      this.refs.interventionPanelLabel.textContent = this.t("liveInterventionAssistant");
+      this.refs.manualQuestionLabel.textContent = this.t("manualQuestion");
+      this.refs.manualQuestionInput.placeholder = this.t("manualQuestionPlaceholder");
+      this.refs.manualQuestionHint.textContent = this.t("manualQuestionHint");
+      this.refs.manualQuestionButton.textContent = this.t("askNow");
       this.refs.aiNotesLabel.textContent = this.t("aiNotes");
       this.refs.aiNotesTitle.textContent = this.t("markdownLectureNotes");
       this.refs.previewTitle.textContent = this.t("preview");
@@ -347,6 +416,12 @@
       this.refs.geminiKeyInput.placeholder = this.t("pasteGeminiKey");
       this.refs.preferredProcessingLanguageLabel.textContent = this.t("preferredProcessingLanguage");
       this.refs.preferredProcessingLanguageInput.placeholder = this.t("preferredProcessingLanguagePlaceholder");
+      this.refs.interventionEnabledLabel.textContent = this.t("interventionEnabled");
+      this.refs.interventionEnabledHelp.textContent = this.t("interventionEnabledHelp");
+      this.refs.assistantScenarioLabel.textContent = this.t("interventionScenario");
+      this.refs.assistantScenarioInput.options[0].textContent = this.t("scenarioClassroom");
+      this.refs.assistantScenarioInput.options[1].textContent = this.t("scenarioInterview");
+      this.refs.interventionPauseLabel.textContent = this.t("interventionPauseThreshold");
       this.refs.recognitionLanguagesLabel.textContent = this.t("recognitionLanguages");
       this.refs.segmentIntervalLabel.textContent = this.t("segmentIntervalFallback");
       this.refs.settingsLanguageLabel.textContent = this.t("interfaceLanguage");
@@ -388,6 +463,12 @@
       if (!this.refs.speechStatus.textContent || this.refs.speechStatus.textContent === MESSAGES.en.idle || this.refs.speechStatus.textContent === MESSAGES["zh-TW"].idle) {
         this.refs.speechStatus.textContent = this.t("idle");
       }
+
+      if (!this.refs.interventionStatus.textContent || this.refs.interventionStatus.textContent === MESSAGES.en.interventionIdle || this.refs.interventionStatus.textContent === MESSAGES["zh-TW"].interventionIdle) {
+        this.refs.interventionStatus.textContent = this.t("interventionIdle");
+      }
+
+      this.setInterventionScenario(this.refs.assistantScenarioInput.value || "classroom");
     },
 
     bindHandlers(handlers) {
@@ -402,6 +483,7 @@
       this.refs.documentInput.addEventListener("change", handlers.onDocumentUpload);
       this.refs.settingsForm.addEventListener("submit", handlers.onSaveSettings);
       this.refs.resetSettingsButton.addEventListener("click", handlers.onResetSettings);
+      this.refs.manualQuestionForm.addEventListener("submit", handlers.onManualQuestion);
 
       [
         this.refs.lectureTitleInput,
@@ -563,6 +645,9 @@
       this.refs.azureRegionInput.value = settings.azureRegion || "";
       this.refs.geminiKeyInput.value = settings.geminiKey || "";
       this.refs.preferredProcessingLanguageInput.value = settings.preferredProcessingLanguage || "";
+      this.refs.interventionEnabledInput.checked = settings.interventionEnabled !== false;
+      this.refs.assistantScenarioInput.value = settings.assistantScenario || "classroom";
+      this.refs.interventionPauseInput.value = settings.interventionPauseMs || 1500;
       this.refs.recognitionLanguagesInput.value = (settings.recognitionLanguages || []).join(", ");
       this.refs.segmentIntervalInput.value = settings.segmentIntervalMinutes || 3;
       this.refs.settingsLanguageInput.value = settings.interfaceLanguage || "en";
@@ -576,10 +661,70 @@
         azureRegion: this.refs.azureRegionInput.value.trim(),
         geminiKey: this.refs.geminiKeyInput.value.trim(),
         preferredProcessingLanguage: this.refs.preferredProcessingLanguageInput.value.trim(),
+        interventionEnabled: this.refs.interventionEnabledInput.checked,
+        assistantScenario: this.refs.assistantScenarioInput.value,
+        interventionPauseMs: Number(this.refs.interventionPauseInput.value),
         recognitionLanguages: this.refs.recognitionLanguagesInput.value,
         segmentIntervalMinutes: Number(this.refs.segmentIntervalInput.value),
         interfaceLanguage: this.refs.settingsLanguageInput.value,
       };
+    },
+
+    setInterventionStatus(message) {
+      this.refs.interventionStatus.textContent = message || this.t("interventionIdle");
+    },
+
+    setManualQuestionBusy(isBusy) {
+      this.refs.manualQuestionInput.disabled = Boolean(isBusy);
+      this.refs.manualQuestionButton.disabled = Boolean(isBusy);
+      this.refs.manualQuestionButton.classList.toggle("opacity-60", Boolean(isBusy));
+      this.refs.manualQuestionButton.classList.toggle("cursor-not-allowed", Boolean(isBusy));
+    },
+
+    getManualQuestion() {
+      return this.refs.manualQuestionInput.value.trim();
+    },
+
+    clearManualQuestion() {
+      this.refs.manualQuestionInput.value = "";
+    },
+
+    setInterventionScenario(scenario) {
+      this.refs.interventionScenarioBadge.textContent = scenario === "interview" ? this.t("scenarioInterview") : this.t("scenarioClassroom");
+    },
+
+    renderInterventions(interventions) {
+      if (!interventions || !interventions.length) {
+        this.refs.interventionList.innerHTML = `<p class="rounded-2xl border border-dashed border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-500">${window.TranscriptProcessor.escapeHtml(this.t("noInterventionsYet"))}</p>`;
+        return;
+      }
+
+      const locale = this.currentLanguage === "zh-TW" ? "zh-TW" : "en-US";
+      this.refs.interventionList.innerHTML = interventions
+        .map((item) => {
+          const actionLabel = item.action === "SUGGEST"
+            ? this.t("actionSuggest")
+            : item.action === "QUALITY_ALERT"
+              ? this.t("actionQualityAlert")
+              : this.t("actionIntervene");
+          const toneClass = item.action === "QUALITY_ALERT"
+            ? "border-amber-200 bg-amber-50"
+            : item.action === "SUGGEST"
+              ? "border-sky-200 bg-sky-50"
+              : "border-emerald-200 bg-emerald-50";
+
+          return `
+            <article class="rounded-2xl border px-4 py-3 ${toneClass}">
+              <div class="flex items-center justify-between gap-3">
+                <span class="rounded-full border border-current/15 bg-white/80 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-700">[ACTION: ${window.TranscriptProcessor.escapeHtml(item.action || "INTERVENE")}] ${window.TranscriptProcessor.escapeHtml(actionLabel)}</span>
+                <span class="text-xs text-zinc-500">${window.TranscriptProcessor.escapeHtml(new Date(item.createdAt || Date.now()).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" }))}</span>
+              </div>
+              ${item.userQuestion ? `<p class="mt-3 rounded-2xl border border-zinc-200 bg-white/80 px-3 py-2 text-xs leading-5 text-zinc-600">${window.TranscriptProcessor.escapeHtml(item.userQuestion)}</p>` : ""}
+              <p class="mt-3 text-sm leading-6 text-zinc-800">${window.TranscriptProcessor.escapeHtml(item.message || "")}</p>
+            </article>
+          `;
+        })
+        .join("");
     },
 
     setRecordingState(isRecording) {

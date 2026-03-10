@@ -205,6 +205,27 @@
             </header>
             <div class="grid gap-4 p-5">
               <div class="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+                <div class="flex items-start justify-between gap-4">
+                  <div>
+                    <p id="interventionPanelLabel" class="text-xs font-semibold uppercase tracking-[0.18em] text-steel">Live Intervention Assistant</p>
+                    <p id="interventionStatus" class="mt-2 text-sm leading-6 text-zinc-600">Monitoring is idle.</p>
+                  </div>
+                  <span id="interventionScenarioBadge" class="rounded-full border border-zinc-300 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-700">Classroom</span>
+                </div>
+                <form id="manualQuestionForm" class="mt-4 space-y-3">
+                  <label class="block">
+                    <span id="manualQuestionLabel" class="block text-xs font-semibold uppercase tracking-[0.18em] text-steel">Manual Question</span>
+                    <textarea id="manualQuestionInput" rows="3" class="mt-2 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm leading-6 outline-none transition focus:border-zinc-500" placeholder="Ask the assistant to explain, clarify, or suggest a follow-up."></textarea>
+                  </label>
+                  <div class="flex items-center justify-between gap-3">
+                    <p id="manualQuestionHint" class="text-xs leading-5 text-zinc-500">This sends an immediate request using the current scenario and transcript context.</p>
+                    <button id="manualQuestionButton" type="submit" class="rounded-full border border-zinc-300 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-800 transition hover:border-zinc-800 hover:text-zinc-900">Ask Now</button>
+                  </div>
+                </form>
+                <div id="interventionList" class="mt-4 space-y-3"></div>
+              </div>
+
+              <div class="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-steel">Preview</p>
                 <div id="notesContainer" class="custom-scrollbar mt-4 h-[68vh] overflow-y-auto whitespace-pre-wrap rounded-2xl border border-zinc-200 bg-white p-4 font-mono text-sm leading-6 text-zinc-800"># Lecture Title
 
@@ -255,6 +276,27 @@ Generated notes will appear here.</div>
             <input id="preferredProcessingLanguageInput" type="text" autocomplete="off" class="mt-2 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500" placeholder="Leave blank to auto detect, e.g. en-US or zh-TW" />
           </label>
 
+          <label class="flex items-center justify-between gap-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 md:col-span-2">
+            <div>
+              <span id="interventionEnabledLabel" class="block text-xs font-semibold uppercase tracking-[0.18em] text-steel">Live Intervention Assistant</span>
+              <span id="interventionEnabledHelp" class="mt-2 block text-sm leading-6 text-zinc-600">Use VAD, audio quality, and scenario rules to decide whether AI should interject during recording.</span>
+            </div>
+            <input id="interventionEnabledInput" type="checkbox" class="h-5 w-5 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500" />
+          </label>
+
+          <label class="block rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+            <span id="assistantScenarioLabel" class="block text-xs font-semibold uppercase tracking-[0.18em] text-steel">Intervention Scenario</span>
+            <select id="assistantScenarioInput" class="mt-2 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500">
+              <option value="classroom">Classroom</option>
+              <option value="interview">Interview</option>
+            </select>
+          </label>
+
+          <label class="block rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+            <span id="interventionPauseLabel" class="block text-xs font-semibold uppercase tracking-[0.18em] text-steel">Intervention Pause Threshold (ms)</span>
+            <input id="interventionPauseInput" type="number" min="1000" max="5000" step="100" class="mt-2 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500" />
+          </label>
+
           <label class="block rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
             <span class="block text-xs font-semibold uppercase tracking-[0.18em] text-steel">Recognition Languages (Auto Detect)</span>
             <input id="recognitionLanguagesInput" type="text" autocomplete="off" class="mt-2 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500" placeholder="en-US, zh-TW" />
@@ -301,6 +343,7 @@ Generated notes will appear here.</div>
     <script src="src/services/speech.js"></script>
     <script src="src/services/rag.js"></script>
     <script src="src/services/gemini.js"></script>
+    <script src="src/services/intervention.js"></script>
     <script src="src/app/lecture-manager.js"></script>
     <script src="src/app/app-controller.js"></script>
     <script src="src/ui/ui.js"></script>

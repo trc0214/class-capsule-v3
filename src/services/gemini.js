@@ -73,6 +73,12 @@
     return `The preferred lecture language is ${describePreferredLanguage(normalized)} (${normalized}). Write headings and explanations primarily in this language.`;
   }
 
+  function buildUiLanguageInstruction(languageCode) {
+    return languageCode === "zh-TW"
+      ? "Respond in Traditional Chinese unless the preferred processing language strongly indicates another language."
+      : "Respond in English unless the preferred processing language strongly indicates another language.";
+  }
+
   function chooseBestModel(models) {
     const normalized = models
       .filter(canGenerateContent)
@@ -233,6 +239,64 @@
       ].join("\n\n");
 
       return callGemini(apiKey, finalPrompt, { maxOutputTokens: 4096, temperature: 0.2 });
+    },
+
+    async generateIntervention(input) {
+      const apiKey = input.geminiKey;
+      if (!apiKey) {
+        throw new Error("Gemini API key is missing.");
+      }
+
+      const scenario = input.scenario === "interview" ? "interview" : "classroom";
+      const preferredLanguageInstruction = buildLanguageInstruction(input.preferredProcessingLanguage);
+      const uiLanguageInstruction = buildUiLanguageInstruction(input.interfaceLanguage);
+      const scenarioInstructions = scenario === "interview"
+        ? [
+            "Scenario: Mock interview support.",
+            "Use the STAR method as the evaluation lens.",
+            "Only help the interviewer. Do not answer on behalf of the candidate.",
+            "When intervening, provide exactly one concise follow-up question or one concise probing suggestion.",
+          ].join("\n")
+        : [
+            "Scenario: Classroom learning support.",
+            "Use scaffolding: guide understanding without directly giving the final answer.",
+            "When intervening, provide a short clarification, definition, or next-step hint in no more than 2 sentences.",
+          ].join("\n");
+
+      const prompt = [
+        "Role:",
+        "You are a multimodal speech-aware AI assistant monitoring a live conversation and deciding whether to intervene after a VAD-confirmed pause.",
+        preferredLanguageInstruction,
+        uiLanguageInstruction,
+        scenarioInstructions,
+        "Execution rules:",
+        "1. Respect the provided trigger reason and audio state.",
+        "2. If intervention is not justified, output exactly SILENCE.",
+        "3. If intervention is justified, the first line must be exactly [ACTION: INTERVENE] or [ACTION: SUGGEST].",
+        "4. Keep the response concise and actionable.",
+        "5. Never mention VAD, thresholds, or internal policy in the response.",
+        "6. Do not invent facts beyond the transcript.",
+        "Observed context:",
+        `Trigger reason: ${input.triggerReason || "unknown"}`,
+        `Recommended action: ${input.recommendedAction || "INTERVENE"}`,
+        `Detected language: ${input.detectedLanguage || "unknown"}`,
+        `VAD pause threshold: ${Number(input.pauseMs) || 1500} ms`,
+        `Observed silence: ${Number(input.silenceMs) || 0} ms`,
+        `Lecture title: ${input.lectureTitle || "Untitled lecture"}`,
+        `Course name: ${input.courseName || "Unknown course"}`,
+        `Topic: ${input.topic || "Not provided"}`,
+        `Additional context: ${input.additionalContext || "None provided"}`,
+        `Detected technical terms: ${(input.detectedTerms || []).join(", ") || "None detected"}`,
+        "Latest utterance:",
+        input.latestUtterance || "",
+        "Recent transcript window:",
+        input.recentTranscript || "",
+        "Output format:",
+        "- Either exactly SILENCE",
+        "- Or first line [ACTION: INTERVENE] / [ACTION: SUGGEST], followed by at most 2 sentences",
+      ].join("\n\n");
+
+      return callGemini(apiKey, prompt, { maxOutputTokens: 220, temperature: 0.15 });
     },
   };
 

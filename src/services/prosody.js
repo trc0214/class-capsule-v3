@@ -44,6 +44,16 @@
   function buildFallbackMessage(trigger, language) {
     const isZh = language === "zh-TW";
 
+    if (trigger.reason === "classroom-recall") {
+      return trigger.action === "SUGGEST"
+        ? isZh
+          ? "[ACTION: SUGGEST]\n這段像是在確認學生是否記得舊知識，適合立刻追問定義、用途或代表例子。"
+          : "[ACTION: SUGGEST]\nThis sounds like a recall check. Ask for the definition, use case, or a canonical example next."
+        : isZh
+          ? "[ACTION: INTERVENE]\n這段像是在確認學生是否記得舊知識，現在適合先補上核心定義，再接代表性例子。"
+          : "[ACTION: INTERVENE]\nThis sounds like a recall check. Add the core definition first, then the canonical example.";
+    }
+
     if (trigger.reason === "classroom-prompt") {
       return trigger.action === "SUGGEST"
         ? isZh
@@ -85,6 +95,10 @@
 
   function summarizeTrigger(reason, language) {
     const isZh = language === "zh-TW";
+
+    if (reason === "classroom-recall") {
+      return isZh ? "課堂回想提問" : "classroom recall";
+    }
 
     if (reason === "classroom-prompt") {
       return isZh ? "課堂拋問" : "classroom prompt";
@@ -250,6 +264,91 @@
     };
   }
 
+  function scoreClassroomRecall(latestUtterance, summary, silenceMs) {
+    const text = String(latestUtterance || "").trim();
+    if (!text) {
+      return { recallScore: 0, recallSignals: [] };
+    }
+
+    const normalized = text.toLowerCase();
+    const signals = [];
+
+    const memoryCheckScore = countMatches(normalized, [
+      /有沒有人知道/,
+      /有人知道/,
+      /還記得嗎/,
+      /記不記得/,
+      /知道嗎/,
+      /想一下/,
+      /誰知道/,
+      /does anyone know/,
+      /who knows/,
+      /do you remember/,
+      /remember this/,
+    ]);
+    if (memoryCheckScore) {
+      signals.push("memory-check");
+    }
+
+    const priorCourseScore = countMatches(normalized, [
+      /一定學過/,
+      /我一定也講過/,
+      /以前講過/,
+      /之前講過/,
+      /修過演算法/,
+      /上次上過/,
+      /課本看過/,
+      /you learned this/,
+      /you saw this before/,
+      /we covered this/,
+      /you took algorithms/,
+    ]);
+    if (priorCourseScore) {
+      signals.push("prior-knowledge");
+    }
+
+    const conceptPromptScore = countMatches(normalized, [
+      /叫做/,
+      /最有名/,
+      /代表/,
+      /是什麼/,
+      /哪一個/,
+      /舉例/,
+      /定義/,
+      /called/,
+      /most famous/,
+      /example/,
+      /definition/,
+      /what is/,
+    ]);
+    if (conceptPromptScore) {
+      signals.push("concept-prompt");
+    }
+
+    const hesitationBoost = countMatches(normalized, [
+      /嗯|欸|那個/,
+      /uh|um|well/,
+    ]) ? 0.06 : 0;
+    const durationBoost = normalizeRange(summary.speechDurationMs, 2500, 9000) * 0.08;
+    const pauseBoost = normalizeRange(silenceMs, 900, 2200) * 0.12;
+
+    const recallScore = clamp(
+      memoryCheckScore * 0.28 +
+      priorCourseScore * 0.28 +
+      conceptPromptScore * 0.18 +
+      hesitationBoost +
+      durationBoost +
+      pauseBoost,
+      0,
+      1
+    );
+
+    return {
+      recallScore: Math.round(recallScore * 1000) / 1000,
+      recallSignals: signals,
+    };
+  }
+
   const LocalProsodyService = {
     DEFAULT_SENSITIVITY,
 
@@ -264,6 +363,9 @@
       const prompt = scenario === "classroom"
         ? scoreClassroomPrompt(input && input.latestUtterance, summary, silenceMs)
         : { promptScore: 0, promptSignals: [] };
+      const recall = scenario === "classroom"
+        ? scoreClassroomRecall(input && input.latestUtterance, summary, silenceMs)
+        : { recallScore: 0, recallSignals: [] };
 
       if (summary.speechDurationMs < 900 || summary.wordCount < 4) {
         return { shouldIntervene: false, scenario };
@@ -272,11 +374,28 @@
       const scores = scoreProsody(summary, silenceMs);
       const threshold = clamp(0.78 - ((sensitivity - 5) * 0.045), 0.5, 0.86);
       const promptThreshold = clamp(0.72 - ((sensitivity - 5) * 0.05), 0.42, 0.82);
+      const recallThreshold = clamp(0.62 - ((sensitivity - 5) * 0.05), 0.38, 0.74);
       const best = [
         { reason: "prosody-confusion", score: scores.uncertaintyScore },
         { reason: "prosody-urgency", score: scores.urgencyScore },
         { reason: "prosody-strain", score: scores.strainScore },
       ].sort((left, right) => right.score - left.score)[0];
+
+      if (scenario === "classroom" && recall.recallScore >= recallThreshold) {
+        return {
+          shouldIntervene: true,
+          scenario,
+          reason: "classroom-recall",
+          action: "INTERVENE",
+          score: recall.recallScore,
+          threshold: recallThreshold,
+          sensitivity,
+          prosodySummary: summary,
+          textSignals: recall.recallSignals,
+          triggerLabel: summarizeTrigger("classroom-recall", interfaceLanguage),
+          localResponse: buildFallbackMessage({ reason: "classroom-recall", action: "INTERVENE" }, interfaceLanguage),
+        };
+      }
 
       if (scenario === "classroom" && prompt.promptScore >= promptThreshold) {
         return {
@@ -301,7 +420,7 @@
           score: best ? best.score : 0,
           threshold,
           prosodySummary: summary,
-          textSignals: prompt.promptSignals,
+          textSignals: prompt.promptSignals.concat(recall.recallSignals),
         };
       }
 

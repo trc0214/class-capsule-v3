@@ -6,10 +6,15 @@
   }
 
   function countWords(text) {
-    return String(text || "")
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean).length;
+    const normalized = String(text || "").trim();
+    if (!normalized) {
+      return 0;
+    }
+
+    const cjkMatches = normalized.match(/[\u3400-\u9fff]/g) || [];
+    const latinMatches = normalized.match(/[A-Za-z0-9]+(?:['’-][A-Za-z0-9]+)*/g) || [];
+    const cjkTokenEstimate = Math.ceil(cjkMatches.length / 2);
+    return cjkTokenEstimate + latinMatches.length;
   }
 
   function normalizeScenario(value) {
@@ -38,6 +43,16 @@
 
   function buildFallbackMessage(trigger, language) {
     const isZh = language === "zh-TW";
+
+    if (trigger.reason === "classroom-prompt") {
+      return trigger.action === "SUGGEST"
+        ? isZh
+          ? "[ACTION: SUGGEST]\n這段像是在拋給全班作答的情境題，適合立刻追問對方的選擇理由與風險取捨。"
+          : "[ACTION: SUGGEST]\nThis sounds like a whole-class scenario prompt. Ask for the reasoning behind the choice and the trade-offs next."
+        : isZh
+          ? "[ACTION: INTERVENE]\n這段像是在拋給全班作答的情境題，現在適合先整理選項，再補上判斷依據。"
+          : "[ACTION: INTERVENE]\nThis sounds like a whole-class scenario prompt. Organize the choices first, then add the decision criteria.";
+    }
 
     if (trigger.reason === "prosody-urgency") {
       return trigger.action === "SUGGEST"
@@ -70,6 +85,10 @@
 
   function summarizeTrigger(reason, language) {
     const isZh = language === "zh-TW";
+
+    if (reason === "classroom-prompt") {
+      return isZh ? "課堂拋問" : "classroom prompt";
+    }
 
     if (reason === "prosody-urgency") {
       return isZh ? "語氣急促" : "urgent tone";
@@ -140,6 +159,97 @@
     };
   }
 
+  function countMatches(text, patterns) {
+    return patterns.reduce((total, pattern) => total + (pattern.test(text) ? 1 : 0), 0);
+  }
+
+  function scoreClassroomPrompt(latestUtterance, summary, silenceMs) {
+    const text = String(latestUtterance || "").trim();
+    if (!text) {
+      return { promptScore: 0, promptSignals: [] };
+    }
+
+    const normalized = text.toLowerCase();
+    const signals = [];
+
+    const audienceScore = countMatches(normalized, [
+      /同學/,
+      /各位/,
+      /大家/,
+      /class/,
+      /everyone/,
+      /anyone/,
+    ]);
+    if (audienceScore) {
+      signals.push("audience-address");
+    }
+
+    const hypotheticalScore = countMatches(normalized, [
+      /如果/,
+      /假如/,
+      /假設/,
+      /if today/,
+      /if you/,
+      /imagine/,
+    ]);
+    if (hypotheticalScore) {
+      signals.push("hypothetical");
+    }
+
+    const choiceScore = countMatches(normalized, [
+      /哪一個|哪個|哪種|哪邊/,
+      /會想用|選哪|怎麼選/,
+      /或者是說|或是說|還是說|或者|還是/,
+      /which one|which would|what would you choose|choose/,
+    ]);
+    if (choiceScore) {
+      signals.push("choice");
+    }
+
+    const roleScore = countMatches(normalized, [
+      /如果你是/,
+      /你是老闆/,
+      /今天你有/,
+      /站在.*角度/,
+      /as the boss/,
+      /if you were the owner/,
+      /if you were the manager/,
+    ]);
+    if (roleScore) {
+      signals.push("role-play");
+    }
+
+    const questionLikeScore = countMatches(normalized, [
+      /\?/,
+      /嗎|呢|喔|哦/,
+      /會不會|要不要|可不可以/,
+      /what do you think|would you|do you think/,
+    ]);
+    if (questionLikeScore) {
+      signals.push("question-like");
+    }
+
+    const repetitionBoost = normalizeRange(summary.wordCount, 12, 48) * 0.1;
+    const pauseBoost = normalizeRange(silenceMs, 900, 2200) * 0.12;
+
+    const promptScore = clamp(
+      audienceScore * 0.16 +
+      hypotheticalScore * 0.2 +
+      choiceScore * 0.24 +
+      roleScore * 0.24 +
+      questionLikeScore * 0.1 +
+      repetitionBoost +
+      pauseBoost,
+      0,
+      1
+    );
+
+    return {
+      promptScore: Math.round(promptScore * 1000) / 1000,
+      promptSignals: signals,
+    };
+  }
+
   const LocalProsodyService = {
     DEFAULT_SENSITIVITY,
 
@@ -151,18 +261,38 @@
       const sensitivity = normalizeSensitivity(input && input.interventionSensitivity);
       const silenceMs = Number(input && input.silenceMs) || 0;
       const summary = describeProsody(input && input.prosody, input && input.utteranceDurationMs, input && input.latestUtterance);
+      const prompt = scenario === "classroom"
+        ? scoreClassroomPrompt(input && input.latestUtterance, summary, silenceMs)
+        : { promptScore: 0, promptSignals: [] };
 
-      if (summary.speechDurationMs < 900 || summary.wordCount < 3) {
+      if (summary.speechDurationMs < 900 || summary.wordCount < 4) {
         return { shouldIntervene: false, scenario };
       }
 
       const scores = scoreProsody(summary, silenceMs);
       const threshold = clamp(0.78 - ((sensitivity - 5) * 0.045), 0.5, 0.86);
+      const promptThreshold = clamp(0.72 - ((sensitivity - 5) * 0.05), 0.42, 0.82);
       const best = [
         { reason: "prosody-confusion", score: scores.uncertaintyScore },
         { reason: "prosody-urgency", score: scores.urgencyScore },
         { reason: "prosody-strain", score: scores.strainScore },
       ].sort((left, right) => right.score - left.score)[0];
+
+      if (scenario === "classroom" && prompt.promptScore >= promptThreshold) {
+        return {
+          shouldIntervene: true,
+          scenario,
+          reason: "classroom-prompt",
+          action: "INTERVENE",
+          score: prompt.promptScore,
+          threshold: promptThreshold,
+          sensitivity,
+          prosodySummary: summary,
+          textSignals: prompt.promptSignals,
+          triggerLabel: summarizeTrigger("classroom-prompt", interfaceLanguage),
+          localResponse: buildFallbackMessage({ reason: "classroom-prompt", action: "INTERVENE" }, interfaceLanguage),
+        };
+      }
 
       if (!best || best.score < threshold) {
         return {
@@ -171,6 +301,7 @@
           score: best ? best.score : 0,
           threshold,
           prosodySummary: summary,
+          textSignals: prompt.promptSignals,
         };
       }
 

@@ -129,6 +129,8 @@
           onStop: () => this.handleStopRecording(),
           onGenerateNotes: () => this.handleGenerateNotes(),
           onNewLecture: () => this.prepareNewLecture(),
+          onExportData: () => this.handleExportData(),
+          onImportData: (event) => this.handleImportData(event),
           onMediaUpload: (event) => this.handleMediaUpload(event),
           onDocumentUpload: (event) => this.handleDocumentUpload(event),
           onManualQuestion: (event) => this.handleManualQuestion(event),
@@ -972,6 +974,73 @@
         }
         this.renderCurrentLecture();
         window.UI.showToast(window.UI.t("settingsReset"));
+      },
+
+      async handleExportData() {
+        if (this.currentLecture) {
+          await this.persistDraft(true);
+        }
+
+        const payload = await window.AppStorage.exportAll();
+        const stamp = new Date(payload.exportedAt).toISOString().replace(/[:.]/g, "-");
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+
+        link.href = url;
+        link.download = `lecture-assistant-backup-${stamp}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 0);
+
+        window.UI.showToast(window.UI.t("exportDataSuccess"));
+      },
+
+      async handleImportData(event) {
+        const file = event.target.files && event.target.files[0];
+        event.target.value = "";
+
+        if (!file) {
+          return;
+        }
+
+        if (this.isRecording) {
+          window.UI.showToast(window.UI.t("importDataRecordingBlocked"), "error");
+          return;
+        }
+
+        try {
+          const text = await file.text();
+          const payload = JSON.parse(text);
+          const result = await window.AppStorage.importAll(payload);
+          const settings = await window.SettingsManager.load();
+
+          this.currentLecture = null;
+          this.currentDocuments = [];
+          this.activeMediaInfo = null;
+          this.transcriptProcessor = this.createTranscriptProcessor(null);
+          this.resetInterventionRuntimeState();
+
+          window.UI.setSettingsForm(settings);
+          window.UI.setLanguage(settings.interfaceLanguage);
+          await this.refreshLectures();
+          await this.restoreDraftIfAvailable();
+
+          if (!this.currentLecture && this.lectures.length) {
+            await this.loadLecture(this.lectures[0].id);
+          }
+
+          if (!this.currentLecture) {
+            this.prepareNewLecture();
+          }
+
+          this.renderCurrentLecture();
+          window.UI.showToast(window.UI.t("importDataSuccess", { count: result.lectureCount }));
+        } catch (error) {
+          console.error(error);
+          window.UI.showToast(window.UI.t("importDataInvalid"), "error");
+        }
       },
 
       async handleLectureMetadataChange() {

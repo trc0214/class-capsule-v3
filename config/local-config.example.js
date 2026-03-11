@@ -1,4 +1,6 @@
 window.LECTURE_ASSISTANT_LOCAL_CONFIG = {
+  storageMode: "browser",
+  storageApiBaseUrl: "",
   azureKey: "",
   azureRegion: "eastus",
   geminiKey: "",

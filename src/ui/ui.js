@@ -6,6 +6,13 @@
       new: "New",
       recovery: "Recovery",
       noPendingDraft: "No pending draft.",
+      backupHelp: "Export a backup before changing localhost or browser storage.",
+      exportData: "Export Data",
+      importData: "Import Data",
+      exportDataSuccess: "Backup downloaded successfully.",
+      importDataSuccess: "Backup restored: {count} lecture(s) imported.",
+      importDataInvalid: "Backup file could not be imported.",
+      importDataRecordingBlocked: "Stop recording before importing a backup.",
       liveTranscript: "Live Transcript",
       untitledLecture: "Untitled lecture",
       noSessionLoaded: "No session loaded",
@@ -122,6 +129,13 @@
       new: "新增",
       recovery: "復原",
       noPendingDraft: "沒有待復原的草稿。",
+      backupHelp: "在更換 localhost 或清除瀏覽器資料前，先匯出備份。",
+      exportData: "匯出資料",
+      importData: "匯入資料",
+      exportDataSuccess: "備份檔已下載。",
+      importDataSuccess: "備份已還原，已匯入 {count} 筆講座。",
+      importDataInvalid: "無法匯入這個備份檔。",
+      importDataRecordingBlocked: "匯入備份前請先停止錄音。",
       liveTranscript: "即時逐字稿",
       untitledLecture: "未命名講座",
       noSessionLoaded: "尚未載入任何講座",
@@ -275,6 +289,10 @@
         historyList: document.getElementById("historyList"),
         recoveryTitle: document.querySelector("#recoveryMessage").previousElementSibling,
         recoveryMessage: document.getElementById("recoveryMessage"),
+        backupHelp: document.getElementById("backupHelp"),
+        exportDataButton: document.getElementById("exportDataButton"),
+        importDataButton: document.getElementById("importDataButton"),
+        importDataInput: document.getElementById("importDataInput"),
         liveTranscriptLabel: document.getElementById("lectureTitleDisplay").previousElementSibling,
         transcriptContainer: document.getElementById("transcriptContainer"),
         notesContainer: document.getElementById("notesContainer"),
@@ -387,6 +405,9 @@
         this.refs.sidebarSettingsButton.setAttribute("aria-label", this.t("settings"));
       }
       this.refs.recoveryTitle.textContent = this.t("recovery");
+      this.refs.backupHelp.textContent = this.t("backupHelp");
+      this.refs.exportDataButton.textContent = this.t("exportData");
+      this.refs.importDataButton.textContent = this.t("importData");
       this.refs.liveTranscriptLabel.textContent = this.t("liveTranscript");
       this.refs.startButton.textContent = this.t("startRecording");
       this.refs.stopButton.textContent = this.t("stopRecording");
@@ -492,6 +513,12 @@
       this.refs.sidebarSettingsButton.addEventListener("click", () => this.openSettings());
       this.refs.closeSettingsButton.addEventListener("click", () => this.closeSettings());
       this.refs.newLectureButton.addEventListener("click", handlers.onNewLecture);
+      this.refs.exportDataButton.addEventListener("click", handlers.onExportData);
+      this.refs.importDataButton.addEventListener("click", () => {
+        this.refs.importDataInput.value = "";
+        this.refs.importDataInput.click();
+      });
+      this.refs.importDataInput.addEventListener("change", handlers.onImportData);
       this.refs.mediaInput.addEventListener("change", handlers.onMediaUpload);
       this.refs.documentInput.addEventListener("change", handlers.onDocumentUpload);
       this.refs.settingsForm.addEventListener("submit", handlers.onSaveSettings);

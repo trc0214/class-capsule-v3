@@ -2,6 +2,8 @@
 
 Lecture Assistant is a browser-only lecture transcription and note generation tool for university students. It uses Azure Speech Service for continuous live transcription, Gemini for structured Markdown notes, IndexedDB for local-first persistence, and optional uploaded course materials to improve summaries.
 
+The workspace now pins Live Server to a stable origin at `http://127.0.0.1:5500` through `.vscode/settings.json` so browser storage does not appear to reset just because the dev server picked a different port.
+
 The live intervention flow now uses a browser-local prosody model for triggering. It listens to tone, energy, pitch variation, and pause behavior instead of keyword rules, and can optionally use Gemini only to phrase a richer intervention message.
 
 ## Project Tree
@@ -56,7 +58,7 @@ Microphone input
 
 - `index.html`: static app shell, CDN dependencies, and layout.
 - `assets/styles/style.css`: lightweight visual styling beyond Tailwind utilities.
-- `src/core/storage.js`: IndexedDB wrapper for lectures, settings, and refresh recovery drafts.
+- `src/core/storage.js`: pluggable persistence facade with a default browser IndexedDB provider and a future-ready remote API provider.
 - `src/core/settings.js`: local settings defaults, normalization, and persistence.
 - `src/core/transcript.js`: paragraph segmentation, transcript buffering, topic-shift heuristics, technical term detection, and transcript highlighting.
 - `src/services/speech.js`: Azure Speech continuous recognition client with reconnect logic, microphone permission handling, and local prosody feature capture.
@@ -87,6 +89,7 @@ Microphone input
 - Autosave every 10 seconds
 - Refresh recovery for in-progress drafts
 - Local lecture history stored in IndexedDB
+- Stable Live Server origin to preserve browser storage across restarts
 - Upload lecture materials in `.txt`, `.md`, or `.pdf`
 - Gemini-powered structured Markdown notes with hierarchical summarization for long transcripts
 - Wake Lock support to reduce sleep interruptions during long lectures
@@ -127,6 +130,8 @@ These provide the most reliable support for:
 ## How To Run Locally
 
 No build step is required.
+
+If you use Live Server in VS Code, this workspace is configured to use `127.0.0.1:5500` so the browser keeps the same storage origin between runs.
 
 ### Optional: keep keys in local files instead of retyping them
 
@@ -174,6 +179,8 @@ If `config/local-config.js` provides a field, it overrides the browser-stored va
 
 Fields:
 
+- `Storage Mode` (`browser` or `remote`)
+- `Storage API Base URL` (used only when `storageMode` is `remote`)
 - `Azure Speech API Key`
 - `Azure Region`
 - `Gemini API Key`

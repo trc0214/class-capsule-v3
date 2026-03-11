@@ -2,8 +2,6 @@
 
 Lecture Assistant is a Vite-powered React application that currently hosts the existing lecture transcription and note generation experience inside a legacy shell. It uses Azure Speech Service for continuous live transcription, Gemini for structured Markdown notes, IndexedDB for local-first persistence, and optional uploaded course materials to improve summaries.
 
-The workspace now pins Live Server to a stable origin at `http://127.0.0.1:5500` through `.vscode/settings.json` so browser storage does not appear to reset just because the dev server picked a different port.
-
 The live intervention flow now uses a browser-local prosody model for triggering. It listens to tone, energy, pitch variation, and pause behavior instead of keyword rules, and can optionally use Gemini only to phrase a richer intervention message.
 
 ## Project Tree
@@ -13,6 +11,8 @@ lecture-assistant/
 ├── .env.example
 ├── .gitignore
 ├── index.html
+├── package.json
+├── vite.config.js
 ├── assets/
 │   └── styles/
 │       └── style.css
@@ -21,7 +21,7 @@ lecture-assistant/
 ├── scripts/
 │   └── generate-local-config.ps1
 ├── src/
-│   ├── app.js
+│   ├── main.jsx
 │   ├── core/
 │   │   ├── settings.js
 │   │   ├── storage.js
@@ -34,6 +34,10 @@ lecture-assistant/
 │   ├── app/
 │   │   ├── app-controller.js
 │   │   └── lecture-manager.js
+│   ├── modern/
+│   │   ├── App.jsx
+│   │   ├── initLegacyApp.js
+│   │   └── components/
 │   └── ui/
 │       └── ui.js
 └── README.md
@@ -56,7 +60,7 @@ Microphone input
 
 ### Modules
 
-- `index.html`: static app shell, CDN dependencies, and layout.
+- `index.html`: Vite entry HTML and CDN-loaded browser SDK dependencies.
 - `assets/styles/style.css`: lightweight visual styling beyond Tailwind utilities.
 - `src/core/storage.js`: pluggable persistence facade with a default browser IndexedDB provider and a future-ready remote API provider.
 - `src/core/settings.js`: local settings defaults, normalization, and persistence.
@@ -68,8 +72,11 @@ Microphone input
 - `src/services/intervention.js`: intervention orchestration that combines local tone triggers with Gemini phrasing fallback.
 - `src/app/app-controller.js`: application orchestration and live intervention scheduling.
 - `src/app/lecture-manager.js`: lecture state creation and transcript restoration helpers.
+- `src/modern/App.jsx`: React shell that renders the core app layout.
+- `src/modern/components/*`: React components for the sidebar, transcript section, notes section, and settings dialog.
+- `src/modern/initLegacyApp.js`: compatibility bridge that boots the existing app logic inside the React shell.
 - `src/ui/ui.js`: DOM rendering and user interaction helpers.
-- `src/app.js`: bootstrap entry point.
+- `src/main.jsx`: Vite bootstrap entry point.
 - `config/local-config.example.js`: tracked template for local browser config values.
 - `scripts/generate-local-config.ps1`: converts a local `.env` file into `config/local-config.js` for browser use.
 
@@ -89,7 +96,6 @@ Microphone input
 - Autosave every 10 seconds
 - Refresh recovery for in-progress drafts
 - Local lecture history stored in IndexedDB
-- Stable Live Server origin to preserve browser storage across restarts
 - Upload lecture materials in `.txt`, `.md`, or `.pdf`
 - Gemini-powered structured Markdown notes with hierarchical summarization for long transcripts
 - Wake Lock support to reduce sleep interruptions during long lectures
@@ -147,8 +153,6 @@ Create a production build:
 npm run build
 ```
 
-If you use Live Server in VS Code, this workspace is configured to use `127.0.0.1:5500` so the browser keeps the same storage origin between runs.
-
 ### Optional: keep keys in local files instead of retyping them
 
 Because this app runs entirely in the browser, a true server-side `.env` secret model is not possible. The browser must still receive the keys in order to call Azure Speech and Gemini directly.
@@ -192,8 +196,6 @@ Keys can be supplied in either of two ways:
 2. Through a local `.env` file converted into `config/local-config.js`, which keeps them out of the committed source tree.
 
 If `config/local-config.js` provides a field, it overrides the browser-stored value for that field.
-
-For staged GitHub pushes during the migration, see `docs/github-sync-plan.md`.
 
 Fields:
 
@@ -323,4 +325,3 @@ Each lecture record contains:
 - Opening `index.html` directly is supported because the app uses classic script tags rather than ES module imports.
 - `dotenv` itself cannot securely protect secrets inside a pure static browser app because the client must still receive those values. The local `.env` to `config/local-config.js` flow is for convenience and keeping secrets out of git, not for server-grade secret isolation.
 - Browser file-origin restrictions vary. If your browser blocks microphone or external requests from `file://`, use a simple static file server as a fallback.
-

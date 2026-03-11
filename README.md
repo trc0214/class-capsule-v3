@@ -1,6 +1,6 @@
 # Lecture Assistant
 
-Lecture Assistant is a browser-only lecture transcription and note generation tool for university students. It uses Azure Speech Service for continuous live transcription, Gemini for structured Markdown notes, IndexedDB for local-first persistence, and optional uploaded course materials to improve summaries.
+Lecture Assistant is a Vite-powered React application that currently hosts the existing lecture transcription and note generation experience inside a legacy shell. It uses Azure Speech Service for continuous live transcription, Gemini for structured Markdown notes, IndexedDB for local-first persistence, and optional uploaded course materials to improve summaries.
 
 The workspace now pins Live Server to a stable origin at `http://127.0.0.1:5500` through `.vscode/settings.json` so browser storage does not appear to reset just because the dev server picked a different port.
 
@@ -113,7 +113,7 @@ Create a Gemini API key with access to `gemini-1.5-pro`.
 
 ### 3. Open the app
 
-Open `index.html` directly in a Chromium-based browser.
+Run the app with `npm run dev` and open the Vite dev server in a Chromium-based browser.
 
 Recommended browsers:
 
@@ -129,7 +129,23 @@ These provide the most reliable support for:
 
 ## How To Run Locally
 
-No build step is required.
+Install dependencies first:
+
+```bash
+npm install
+```
+
+Start the development server:
+
+```bash
+npm run dev
+```
+
+Create a production build:
+
+```bash
+npm run build
+```
 
 If you use Live Server in VS Code, this workspace is configured to use `127.0.0.1:5500` so the browser keeps the same storage origin between runs.
 
@@ -142,9 +158,9 @@ The supported local workflow is:
 - Copy `.env.example` to `.env` and fill in your keys.
 - Run `pwsh -ExecutionPolicy Bypass -File .\scripts\generate-local-config.ps1`.
 - This creates `config/local-config.js`, which is ignored by git.
-- Open `index.html` and the settings form will be prefilled from that local file.
+- Start the app and the settings form will be prefilled from that local file.
 
-1. Open `index.html` in the browser.
+1. Run `npm run dev`.
 2. Open `Settings`.
 3. Enter:
    - Azure Speech API key
@@ -162,7 +178,7 @@ The supported local workflow is:
 
 If your laptop battery dies during class, you can still recover by uploading a saved recording afterward.
 
-1. Open `index.html` in Chrome or Edge.
+1. Run `npm run dev` in Chrome or Edge.
 2. Enter Azure Speech settings.
 3. Use the `Uploaded Media` card to choose an audio or video file.
 4. Wait for browser-side playback transcription to finish.
@@ -176,6 +192,8 @@ Keys can be supplied in either of two ways:
 2. Through a local `.env` file converted into `config/local-config.js`, which keeps them out of the committed source tree.
 
 If `config/local-config.js` provides a field, it overrides the browser-stored value for that field.
+
+For staged GitHub pushes during the migration, see `docs/github-sync-plan.md`.
 
 Fields:
 

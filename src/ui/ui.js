@@ -832,7 +832,23 @@
     },
 
     renderNotes(markdown) {
-      this.refs.notesContainer.textContent = markdown || this.t("defaultNotes");
+      const source = markdown || this.t("defaultNotes");
+
+      if (!window.marked || !window.DOMPurify) {
+        this.refs.notesContainer.textContent = source;
+        return;
+      }
+
+      const rendered = window.marked.parse(source, {
+        breaks: true,
+        gfm: true,
+      });
+
+      const sanitized = window.DOMPurify.sanitize(rendered, {
+        USE_PROFILES: { html: true },
+      });
+
+      this.refs.notesContainer.innerHTML = sanitized;
     },
 
     renderDocuments(documents) {

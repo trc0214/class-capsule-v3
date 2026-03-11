@@ -1,4 +1,13 @@
+import DOMPurify from "dompurify";
+import { marked } from "marked";
+
 const defaultNotes = `# Lecture Title\n\nDate\n\n## Lecture Summary\n\nGenerated notes will appear here.`;
+const defaultNotesMarkup = DOMPurify.sanitize(marked.parse(defaultNotes, {
+  breaks: true,
+  gfm: true,
+}), {
+  USE_PROFILES: { html: true },
+});
 
 export function NotesSection() {
   return (
@@ -32,7 +41,7 @@ export function NotesSection() {
 
         <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-steel">Preview</p>
-          <div id="notesContainer" className="custom-scrollbar mt-4 h-[68vh] overflow-y-auto whitespace-pre-wrap rounded-2xl border border-zinc-200 bg-white p-4 font-mono text-sm leading-6 text-zinc-800">{defaultNotes}</div>
+          <div id="notesContainer" className="prose-markdown custom-scrollbar mt-4 h-[68vh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-4 text-sm leading-6 text-zinc-800" dangerouslySetInnerHTML={{ __html: defaultNotesMarkup }}></div>
         </div>
       </div>
     </section>

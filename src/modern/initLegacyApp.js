@@ -1,3 +1,4 @@
+import DOMPurify from "dompurify";
 import { marked } from "marked";
 import "../core/storage.js";
 import "../core/settings.js";
@@ -17,6 +18,7 @@ export async function initLegacyApp() {
   }
 
   window.LECTURE_ASSISTANT_LOCAL_CONFIG = window.LECTURE_ASSISTANT_LOCAL_CONFIG || {};
+  window.DOMPurify = DOMPurify;
   window.marked = marked;
   const app = window.AppController.createController();
 

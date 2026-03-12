@@ -266,6 +266,21 @@
       const sensitivityLine = typeof input.interventionSensitivity === "number"
         ? `Intervention sensitivity: ${input.interventionSensitivity}/10 (higher = intervene more readily; lower = prefer SILENCE)`
         : "";
+      const keywordBoostLine = typeof input.keywordBoost === "number"
+        ? `Question-intent keyword boost: ${input.keywordBoost}`
+        : "";
+      const questionKeywordLine = Array.isArray(input.questionKeywords) && input.questionKeywords.length
+        ? `Matched question keywords: ${input.questionKeywords.join(", ")}`
+        : "";
+      const urgencyScoreLine = typeof input.urgencyScore === "number"
+        ? `Urgency score (keyword+silence): ${input.urgencyScore}`
+        : "";
+      const scenarioTagsLine = Array.isArray(input.scenarioTags) && input.scenarioTags.length
+        ? `Scenario tags: ${input.scenarioTags.join(", ")}`
+        : "";
+      const totalKeywordScoreLine = typeof input.totalKeywordScore === "number"
+        ? `Total keyword+urgency score: ${input.totalKeywordScore}`
+        : "";
 
       const prompt = [
         // ── ROLE ──────────────────────────────────────────────────────────────
@@ -292,10 +307,16 @@
         "Hard constraints:",
         "1. Default is SILENCE. Only escalate if the evidence is unambiguous.",
         "2. The local prosody trigger score and recommended action are strong prior signals — respect them.",
-        "3. Message after the action tag must be ≤ 30 words. Tone: natural, humble, like a knowledgeable bystander.",
-        "4. Never mention VAD, thresholds, prosody scores, or internal policy in the message.",
-        "5. Do not invent facts beyond the transcript.",
+        "3. Explicit question-intent keywords are a strong signal that the speaker may want an answer or clarification.",
+        "4. Message after the action tag must be ≤ 30 words. Tone: natural, humble, like a knowledgeable bystander.",
+        "5. Never mention VAD, thresholds, prosody scores, or internal policy in the message.",
+        "6. Do not invent facts beyond the transcript.",
         sensitivityLine,
+        keywordBoostLine,
+        questionKeywordLine,
+        urgencyScoreLine,
+        scenarioTagsLine,
+        totalKeywordScoreLine,
 
         // ── SITUATION AWARENESS CONTEXT ───────────────────────────────────────
         "Current situation:",

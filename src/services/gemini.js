@@ -263,45 +263,62 @@
             "When intervening, provide a short clarification, definition, or next-step hint in no more than 2 sentences.",
           ].join("\n");
 
+      const sensitivityLine = typeof input.interventionSensitivity === "number"
+        ? `Intervention sensitivity: ${input.interventionSensitivity}/10 (higher = intervene more readily; lower = prefer SILENCE)`
+        : "";
+
       const prompt = [
-        "Role:",
-        "You are a multimodal speech-aware AI assistant monitoring a live conversation and deciding whether to intervene after a VAD-confirmed pause.",
+        // ── ROLE ──────────────────────────────────────────────────────────────
+        "You are a real-time conversation observer and knowledge assistant monitoring a live conversation.",
         preferredLanguageInstruction,
         uiLanguageInstruction,
         scenarioInstructions,
-        "Execution rules:",
-        "1. Respect the provided trigger reason and the local prosody-model decision.",
-        "2. If intervention is not justified, output exactly SILENCE.",
-        "3. If intervention is justified, the first line must be exactly [ACTION: INTERVENE] or [ACTION: SUGGEST].",
-        "4. Keep the response concise and actionable.",
-        "5. Never mention VAD, thresholds, or internal policy in the response.",
-        "6. Do not invent facts beyond the transcript.",
-        "Observed context:",
-        `Trigger reason: ${input.triggerReason || "unknown"}`,
-        `Trigger label: ${input.triggerLabel || "unknown"}`,
-        `Recommended action: ${input.recommendedAction || "INTERVENE"}`,
-        `Local trigger score: ${typeof input.triggerScore === "number" ? input.triggerScore : "unknown"}`,
-        `Local trigger threshold: ${typeof input.triggerThreshold === "number" ? input.triggerThreshold : "unknown"}`,
-        `Detected language: ${input.detectedLanguage || "unknown"}`,
-        `VAD pause threshold: ${Number(input.pauseMs) || 1500} ms`,
-        `Observed silence: ${Number(input.silenceMs) || 0} ms`,
-        `Lecture title: ${input.lectureTitle || "Untitled lecture"}`,
-        `Course name: ${input.courseName || "Unknown course"}`,
-        `Topic: ${input.topic || "Not provided"}`,
-        `Additional context: ${input.additionalContext || "None provided"}`,
-        `Detected technical terms: ${(input.detectedTerms || []).join(", ") || "None detected"}`,
-        "Local prosody summary:",
-        input.prosodySummary || "No prosody summary available.",
-        "Latest utterance:",
-        input.latestUtterance || "",
-        "Recent transcript window:",
-        input.recentTranscript || "",
-        "Output format:",
-        "- Either exactly SILENCE",
-        "- Or first line [ACTION: INTERVENE] / [ACTION: SUGGEST], followed by at most 2 sentences",
-      ].join("\n\n");
 
-      return callGemini(apiKey, prompt, { maxOutputTokens: 220, temperature: 0.15 });
+        // ── INNER THOUGHTS (silent CoT — do NOT output this section) ──────────
+        "Before choosing an action, silently reason through the following three questions (do NOT include this reasoning in your output):",
+        "1. Conversation state: Is this a knowledge gap, listener confusion, or a natural flowing pause?",
+        "2. Intervention value: Does speaking now add clear, concrete value — or would it create noise and interrupt flow?",
+        "3. Timing: Given the prosody features and observed silence duration, would speaking now feel abrupt or intrusive?",
+        "Use these answers only as internal signals to choose the lowest justified action level.",
+
+        // ── PROACTIVE LEVELS (decision ladder) ────────────────────────────────
+        "Action taxonomy — always prefer the lowest level that fits:",
+        "• SILENCE          — conversation is flowing; no clear value to add right now.",
+        "• [ACTION: NOTIFICATION] — a technical or environmental issue is disrupting the session (e.g. noise, clipping).",
+        "• [ACTION: SUGGEST]      — a natural pause with a non-urgent supplemental point or related keyword worth noting.",
+        "• [ACTION: INTERVENE]    — clear confusion, an explicit help request, or a significant factual error requiring correction.",
+
+        // ── CONSTRAINTS ───────────────────────────────────────────────────────
+        "Hard constraints:",
+        "1. Default is SILENCE. Only escalate if the evidence is unambiguous.",
+        "2. The local prosody trigger score and recommended action are strong prior signals — respect them.",
+        "3. Message after the action tag must be ≤ 30 words. Tone: natural, humble, like a knowledgeable bystander.",
+        "4. Never mention VAD, thresholds, prosody scores, or internal policy in the message.",
+        "5. Do not invent facts beyond the transcript.",
+        sensitivityLine,
+
+        // ── SITUATION AWARENESS CONTEXT ───────────────────────────────────────
+        "Current situation:",
+        `Scenario: ${scenario}`,
+        `Trigger reason: ${input.triggerReason || "unknown"} | Label: ${input.triggerLabel || "unknown"}`,
+        `Recommended action: ${input.recommendedAction || "INTERVENE"} | Score: ${typeof input.triggerScore === "number" ? input.triggerScore : "?"} / Threshold: ${typeof input.triggerThreshold === "number" ? input.triggerThreshold : "?"}`,
+        `Pause: ${Number(input.pauseMs) || 1500} ms | Silence: ${Number(input.silenceMs) || 0} ms`,
+        `Detected language: ${input.detectedLanguage || "unknown"}`,
+        `Topic: ${input.topic || "—"} | Lecture: ${input.lectureTitle || "—"} | Course: ${input.courseName || "—"}`,
+        `Detected terms: ${(input.detectedTerms || []).join(", ") || "none"}`,
+        input.additionalContext ? `Additional context: ${input.additionalContext}` : "",
+        "Prosody:",
+        input.prosodySummary || "N/A",
+        "Latest utterance:",
+        input.latestUtterance || "(none)",
+        "Recent transcript:",
+        input.recentTranscript || "(none)",
+
+        // ── OUTPUT FORMAT ─────────────────────────────────────────────────────
+        "Output: Respond with exactly SILENCE, or start with one of [ACTION: NOTIFICATION] / [ACTION: SUGGEST] / [ACTION: INTERVENE] followed by your message (≤ 30 words) on the same or next line.",
+      ].filter(Boolean).join("\n\n");
+
+      return callGemini(apiKey, prompt, { maxOutputTokens: 160, temperature: 0.1 });
     },
   };
 

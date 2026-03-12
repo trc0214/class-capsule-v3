@@ -88,7 +88,7 @@
       return null;
     }
 
-    const actionMatch = raw.match(/^\[ACTION:\s*(INTERVENE|SUGGEST|QUALITY_ALERT)\]\s*/i);
+    const actionMatch = raw.match(/^\[ACTION:\s*(INTERVENE|SUGGEST|NOTIFICATION|QUALITY_ALERT)\]\s*/i);
     const action = actionMatch ? actionMatch[1].toUpperCase() : trigger.action;
     const message = raw.replace(/^\[ACTION:[^\]]+\]\s*/i, "").trim();
 
@@ -149,6 +149,7 @@
           triggerThreshold: trigger.threshold,
           prosodySummary: formatProsodySummary(trigger.prosodySummary || input.prosody, input.interfaceLanguage),
           triggerLabel: trigger.triggerLabel,
+          interventionSensitivity: input.interventionSensitivity,
         });
       } catch (error) {
         console.warn("Gemini intervention fallback to local tone response", error);
